@@ -13,7 +13,6 @@ import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { MeasurementsPage } from '@/pages/Measurements/MeasurementsPage'
 import { pullAll, schedulePush, isSupabaseReachable } from '@/lib/sync'
 import { seedUserContext } from '@/lib/contextSeed'
-import { DiagnosticsPage } from '@/pages/Diagnostics/DiagnosticsPage'
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSetup, isUnlocked } = useAuthStore()
@@ -51,7 +50,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/diagnostics" element={<DiagnosticsPage />} />
         <Route path="*" element={
           <AuthGate>
             <SyncInit />
