@@ -36,9 +36,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export function setSupabaseAuthHeader(token: string) {
   // @ts-expect-error - Custom headers on Supabase rest client
-  if (supabase.rest) {
+  if (supabase.rest && supabase.rest.headers) {
     // @ts-expect-error - Custom headers on Supabase rest client
-    supabase.rest.headers['x-fitos-auth'] = token
+    const headers = supabase.rest.headers
+    if (typeof headers.set === 'function') {
+      headers.set('x-fitos-auth', token)
+    } else {
+      (headers as unknown as Record<string, string>)['x-fitos-auth'] = token
+    }
   }
 }
 
