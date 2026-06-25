@@ -219,36 +219,29 @@ The sync engine `pushAll()` in `src/lib/sync.ts` initiates upserts for all table
 | PWA support | No |
 | Accessibility compliance | None |
 
----
-
 ## Priorities for Next Developer
 
 ### Completed (Milestones)
-- **Phase 2C Recomposition Intelligence (Wave 2):** Fully implemented body measurements tracking page (Metric/Imperial display scaling), Physique Analytics progress view (weight/waist charts, timeline classifications, monthly summaries), Dashboard status widgets, AI Coach prompt context injections, and a 46-assertion unit test suite.
-- **Phase 2C UI Surfacing (Wave 1):** Fully surfaced deterministic training intelligence to client UI components (memoized via `useMemo` caching), recovery & deload banners, exercise analytics modal, collapsible set-level workout history logs, and AI coach training context.
-- **Phase 2B Progressive Overload Engine:** Deterministic, local strength progression recommendation engine with readiness scoring, fatigue warning indicators, volume checks, and exercise-specific target increments.
+*   **Production Authentication & Sync Stabilization (Latest)**: Resolved browser `Headers.set()` token delivery omission, serialized profile writes in `pushAll()`, resolved profile `UPSERT` RLS conflicts by introducing `profile_insert_policy`, and successfully tested multi-device sync.
+*   **Comprehensive Documentation Overhaul**: Wrote detailed system documents under `docs/` (ADRs, Auth, Sync, DB, Deployment, Troubleshooting, Testing) and updated root-level context files.
+*   **Physique & Recomposition Analysis**: Deployed physical circumferences log, analytics charts, physique status widgets, and AI coach prompt injections.
+*   **Progressive Overload UI Surfacing**: Surfaced training overlays, banners, exercise modals, set breakdown PR trophys, and LLM prompt serialization.
 
 ### Must Do (Technical Debt & Security)
-1. ✅ Inline the `import.meta.env.DEV` check in `useSettingsStore` directly to guarantee dead-code elimination (DCE) of the default Groq API key in production builds. (Done)
-2. ✅ Serialize the sync engine `pushAll()` call so the `profiles` table is uploaded and verified first, preventing PostgreSQL RLS race conditions during initial provisioning. (Done)
-3. ❌ Remove unused dependencies: Framer Motion, TanStack React Query, Zod (or integrate them).
-4. ❌ Delete `src/App.css` (dead Vite starter code).
-5. ❌ Add React error boundaries to handle runtime faults without full application crash.
-6. ❌ Limit and prune chat message history (e.g. max 200 messages) in Zustand store to avoid localStorage bloating.
-7. ❌ Cache the Dashboard's AI daily brief with a time-to-live (e.g., 1 hour) instead of calling Groq API on every mount.
+1. ❌ Remove unused dependencies: Framer Motion, TanStack React Query, Zod.
+2. ❌ Delete `src/App.css` (dead Vite starter code).
+3. ❌ Add React error boundaries around page views (Dashboard, settings, logs) to prevent client crashes.
+4. ❌ Limit and prune chat message history (e.g. max 200 messages) in Zustand store to avoid localStorage bloating.
+5. ❌ Cache the Dashboard's AI daily brief with a TTL (e.g., 1 hour) instead of calling Groq API on every mount.
 
 ### Should Do (Feature Completeness)
 1. Apply unit conversion (kg/lbs, kcal/kj) settings throughout the UI.
-2. ✅ Build UI for body measurements (Zustand store + database schema already exist). (Done)
-3. Build UI for saved meals (Zustand store + database schema already exist).
-4. ✅ Build UI for custom exercise creation (Zustand store supports it). (Done)
-5. ✅ Build UI for workout template CRUD (Zustand store supports it). (Done)
-6. Add weekly/monthly nutrition trend charts.
+2. Build UI for saved meals (Zustand store + database schema already exist).
+3. Add weekly/monthly nutrition trend charts.
 
 ### Nice to Have (Polish)
 1. Integrate PWA support (service worker, manifest) for a native app feel.
-2. Implement data export/import (CSV/JSON formats).
-3. Implement alternative AI providers (OpenAI, Gemini, Anthropic classes).
-4. Build a light theme toggle.
-5. Create a mobile camera barcode scanner UI.
-6. Build workout analytics charts (volume trends, PR timeline heatmaps).
+2. Implement alternative AI providers (OpenAI, Gemini, Anthropic classes).
+3. Build a light theme toggle.
+4. Create a mobile camera barcode scanner UI.
+5. Build workout analytics charts (volume trends, PR timeline heatmaps).

@@ -100,8 +100,7 @@ d:\FitOS\
 │   │
 │   └── pages/
 │       ├── Auth/
-│       │   ├── LockScreen.tsx    # Password unlock screen
-│       │   └── SetupScreen.tsx   # First-run 3-step wizard
+│       │   └── LockScreen.tsx    # Password unlock & pairing screen
 │       ├── Dashboard/
 │       │   └── Dashboard.tsx     # Main dashboard with all widgets
 │       ├── Food/
@@ -140,11 +139,10 @@ d:\FitOS\
 
 `App.tsx` wraps all routes in an `AuthGate` component:
 
-1. If `!isSetup` → show `SetupScreen` (first-run wizard)
-2. If `!isUnlocked` → show `LockScreen` (password gate)
-3. Otherwise → render the app shell with routes
+1. If the app is locked (`!isSetup || !isUnlocked`) → show `LockScreen` (handles initial setup, unlocking, and new device pairing).
+2. Otherwise → render the app shell with routes.
 
-The auth store uses `partialize` to persist only `isSetup`, `passwordHash`, and `recoveryHash` — never the unlocked state. Every tab/refresh requires re-authentication.
+The auth store uses `partialize` to persist `isSetup`, `passwordHash`, `recoveryHash`, and `syncToken` — never the unlocked state. Every browser session or refresh requires re-authentication via the lock screen.
 
 ### Component Patterns
 

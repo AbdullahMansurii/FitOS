@@ -13,7 +13,7 @@ PROJECT_CONTEXT.md
 ARCHITECTURE.md
 CHANGELOG.md
 MODEL_HANDOVER.md
-DECISIONS.md
+docs/ARCHITECTURE_DECISIONS.md
 ```
 
 Purpose:
@@ -22,7 +22,7 @@ Purpose:
 * ARCHITECTURE.md → Technical architecture
 * CHANGELOG.md → Feature and version history
 * MODEL_HANDOVER.md → Onboarding guide for AI models
-* DECISIONS.md → Important product and engineering decisions
+* docs/ARCHITECTURE_DECISIONS.md → Important product and engineering decisions
 
 ---
 
@@ -46,7 +46,7 @@ Read:
 2. ARCHITECTURE.md
 3. CHANGELOG.md
 4. MODEL_HANDOVER.md
-5. DECISIONS.md
+5. docs/ARCHITECTURE_DECISIONS.md
 
 Do not write code.
 
@@ -184,7 +184,7 @@ Add:
 * Fixes
 * Improvements
 
-### DECISIONS.md
+### docs/ARCHITECTURE_DECISIONS.md
 
 Add:
 

@@ -94,7 +94,6 @@
 
 | Feature | Notes |
 |---------|-------|
-| **Data Export/Import (Completed)** | Full local JSON backup export/restore and Supabase snapshot downloads |
 | **Nutrition Charts** | No weekly/monthly nutrition trend charts |
 | **Workout Analytics** | No volume/frequency/PR trend charts |
 | **Body Fat Estimation** | `bodyFatPct` field exists on WeightLog but unused |
@@ -110,10 +109,9 @@
 
 ### 1. Feature Completeness
 - **Unit Conversions:** Apply weight (kg/lbs) and energy (kcal/kJ) conversions across all dashboard widgets, diaries, and logs.
-- **Body Measurements & Saved Meals UI:** Build frontend pages or forms to view, add, and reuse body measurements and saved meals, fully utilizing the existing stores and database schemas.
+- **Saved Meals UI:** Build frontend pages or forms to view, add, and reuse saved meals, fully utilizing the existing stores and database schemas.
 
 ### 2. Polish & Quality
-- **Error Boundaries:** Wrap page routes to prevent individual component failures from crashing the entire client.
 - **PWA & Offline Assets Caching:** Add a Vite PWA plugin to cache frontend assets so the application behaves as a true desktop/mobile offline utility.
 - **Pruning Chat Logs:** Implement limits on the chat store to restrict historical logs to the most recent ~200 messages, avoiding Zustand localStorage bloat over time.
 

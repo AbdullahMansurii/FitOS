@@ -37,7 +37,7 @@
 | File | Lines | Risk | Purpose | Key Exports |
 |------|-------|------|---------|-------------|
 | [src/main.tsx](file:///d:/FitOS/src/main.tsx) | 14 | 🟡 | React root, QueryClientProvider | — |
-| [src/App.tsx](file:///d:/FitOS/src/App.tsx) | 75 | 🔴 | Router, AuthGate, SyncInit | — |
+| [src/App.tsx](file:///d:/FitOS/src/App.tsx) | 79 | 🔴 | Router, AuthGate, SyncInit | — |
 | [src/index.css](file:///d:/FitOS/src/index.css) | 497 | 🔴 | Global design system (tokens + components) | CSS custom properties, component classes |
 | [src/App.css](file:///d:/FitOS/src/App.css) | ~50 | 🟢 | ⚠️ DEAD CODE — Vite starter CSS (REMOVED). | — |
 
@@ -56,7 +56,7 @@
 | File | Lines | Risk | Purpose | Key Exports |
 |------|-------|------|---------|-------------|
 | [src/store/index.ts](file:///d:/FitOS/src/store/index.ts) | 541 | 🔴 | Zustand stores (all domain state, sync trigger) | `useProfileStore`, `useGoalsStore`, `useWeightStore`, `useFoodStore`, `useWorkoutStore`, `useMemoryStore`, `useChatStore`, `useSettingsStore`, `useUIStore` |
-| [src/store/authStore.ts](file:///d:/FitOS/src/store/authStore.ts) | 207 | 🔴 | Authentication store (bcrypt + deterministic Web Crypto SHA-256 token) | `useAuthStore`, `deriveSyncToken` |
+| [src/store/authStore.ts](file:///d:/FitOS/src/store/authStore.ts) | 279 | 🔴 | Authentication store (bcrypt + deterministic Web Crypto SHA-256 token) | `useAuthStore`, `deriveSyncToken` |
 
 ---
 
@@ -118,7 +118,7 @@
 
 | File | Lines | Risk | Route | Sub-components | Dependencies |
 |------|-------|------|-------|---------------|-------------|
-| [src/pages/Auth/LockScreen.tsx](file:///d:/FitOS/src/pages/Auth/LockScreen.tsx) | 145 | 🟡 | (auth gate) | — | `authStore` |
+| [src/pages/Auth/LockScreen.tsx](file:///d:/FitOS/src/pages/Auth/LockScreen.tsx) | 153 | 🟡 | (auth gate) | — | `authStore` |
 | [src/pages/Dashboard/Dashboard.tsx](file:///d:/FitOS/src/pages/Dashboard/Dashboard.tsx) | 421 | 🟡 | `/dashboard` | — | `useGoalsStore`, `useWeightStore`, `useFoodStore`, `useWorkoutStore`, `useMemoryStore`, `useProfileStore`, `useSettingsStore`, `ai.ts`, `utils` |
 | [src/pages/Food/FoodPage.tsx](file:///d:/FitOS/src/pages/Food/FoodPage.tsx) | 796 | 🟡 | `/food` | `FoodSearchResult` | `useFoodStore`, `useGoalsStore`, `useSettingsStore`, `ai.ts`, `foodApi.ts`, `MacroRing`, `foodMapper.ts` |
 | [src/pages/Workout/WorkoutPage.tsx](file:///d:/FitOS/src/pages/Workout/WorkoutPage.tsx) | 1099 | 🟡 | `/workout` | `TemplateCard`, `ExerciseCard`, `SessionTimer`, `TemplateEditor` | `useWorkoutStore`, `useSettingsStore`, `utils`, `exerciseSearch.ts` |
@@ -159,7 +159,6 @@
 main.tsx → App.tsx
   ├── AuthGate
   │   ├── authStore.ts
-  │   ├── SetupScreen.tsx → authStore, profileStore
   │   └── LockScreen.tsx → authStore
   │
   ├── SyncInit → sync.ts → supabase.ts

@@ -5,6 +5,16 @@
 
 ---
 
+## [1.0.1] — 2026-06-25
+
+### Added
+- **Repository Documentation Suite:** Created a comprehensive directory of system documentation under `docs/` detailing architectural decisions, authentication flows, the sync engine, database RLS/triggers, deployment setup, troubleshooting, and testing validation rules.
+
+### Fixed
+- **Supabase Profile Upsert RLS Conflict:** Dropped the overly restrictive `profile_insert_empty` policy and replaced it with `profile_insert_policy` to allow the authorized owner to perform profile UPSERTs (`POST /profiles?on_conflict=id`) successfully.
+- **Headers.set() Client Token Omission:** Updated `setSupabaseAuthHeader` in `supabase.ts` to use the native browser `Headers.set()` function, resolving an issue where dynamic token updates were omitted from outgoing requests.
+- **Codebase Log and Diagnostics Cleanup:** Deleted the temporary diagnostics route, removed the `DiagnosticsPage` component, and cleaned up debug `console.log` statements in `authStore.ts`.
+
 ## [1.0.0] — 2026-06-25
 
 ### Added
