@@ -59,6 +59,13 @@ export const useAuthStore = create<AuthState>()(
         const { passwordHash, syncToken } = get()
         const derivedToken = await deriveSyncToken(password)
 
+        console.log('[FitOS Auth Debug] unlock() called')
+        console.log('[FitOS Auth Debug] Entered password:', password)
+        console.log('[FitOS Auth Debug] Derived token:', derivedToken)
+        console.log('[FitOS Auth Debug] Current auth store syncToken:', syncToken)
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[FitOS Auth Debug] Header before set:', supabase.rest?.headers?.['x-fitos-auth'])
+
         // Case A: Local store has credentials (offline/cache path)
         if (passwordHash) {
           const ok = await bcrypt.compare(password, passwordHash)
@@ -92,12 +99,26 @@ export const useAuthStore = create<AuthState>()(
 
         // Case B: No local store credentials (new device pairing/initial setup)
         setSupabaseAuthHeader(derivedToken)
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[FitOS Auth Debug] Header after set:', supabase.rest?.headers?.['x-fitos-auth'])
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[FitOS Auth Debug] Entire supabase.rest.headers:', JSON.stringify(supabase.rest?.headers))
+
         try {
-          const { data: profileRow, error: fetchErr } = await supabase
+          console.log('[FitOS Auth Debug] Executing SELECT query on profiles table...')
+          const res = await supabase
             .from('profiles')
             .select('*')
             .limit(1)
             .maybeSingle()
+          
+          console.log('[FitOS Auth Debug] SELECT raw response:', JSON.stringify(res))
+          console.log('[FitOS Auth Debug] SELECT status:', res.status)
+          console.log('[FitOS Auth Debug] SELECT statusText:', res.statusText)
+          console.log('[FitOS Auth Debug] SELECT data:', JSON.stringify(res.data))
+          console.log('[FitOS Auth Debug] SELECT error:', JSON.stringify(res.error))
+
+          const { data: profileRow, error: fetchErr } = res
           
           if (fetchErr) {
             console.error('[FitOS Auth] Profile fetch failed:', fetchErr.message)
@@ -105,6 +126,7 @@ export const useAuthStore = create<AuthState>()(
           }
           
           if (profileRow) {
+            console.log('[FitOS Auth Debug] Profile found in SELECT, pairing device...')
             // Pairing success: Profile found with matching derived token
             const { useProfileStore } = await import('./index')
             useProfileStore.getState().setProfile({
@@ -128,6 +150,7 @@ export const useAuthStore = create<AuthState>()(
             })
             return { success: true }
           } else {
+            console.log('[FitOS Auth Debug] No profile found in SELECT. Attempting INSERT...')
             // Either incorrect password (no profile matches derived token) OR DB is empty (first launch)
             const defaultId = crypto.randomUUID()
             const { error: insErr } = await supabase.from('profiles').insert({
@@ -140,6 +163,7 @@ export const useAuthStore = create<AuthState>()(
             })
 
             if (insErr) {
+              console.log('[FitOS Auth Debug] INSERT failed:', JSON.stringify(insErr))
               if (insErr.code === '23505') {
                 // Unique constraint violated -> profile already exists -> wrong password!
                 return { success: false, error: 'Incorrect password' }
