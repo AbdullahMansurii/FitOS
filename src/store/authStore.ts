@@ -103,6 +103,14 @@ export const useAuthStore = create<AuthState>()(
         console.log('[FitOS Auth Debug] Header after set:', supabase.rest?.headers?.['x-fitos-auth'])
         // @ts-expect-error - Custom headers on Supabase rest client
         console.log('[FitOS Auth Debug] Entire supabase.rest.headers:', JSON.stringify(supabase.rest?.headers))
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[Debug] headers object:', supabase.rest?.headers)
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[Debug] instanceof Headers:', supabase.rest?.headers instanceof Headers)
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[Debug] constructor:', supabase.rest?.headers?.constructor?.name)
+        // @ts-expect-error - Custom headers on Supabase rest client
+        console.log('[Debug] typeof headers.set:', typeof supabase.rest?.headers?.set)
 
         try {
           console.log('[FitOS Auth Debug] Executing SELECT query on profiles table...')
