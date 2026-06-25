@@ -10,8 +10,8 @@
 |-------------------|--------------------------------------------|
 | **Name**          | FitOS                                      |
 | **Tagline**       | Your Personal Fitness Operating System     |
-| **Version**       | 0.7.0-alpha                                |
-| **Product Maturity**| Alpha (Stable Core, Partial Feature Coverage)|
+| **Version**       | 0.8.0-alpha                                |
+| **Product Maturity**| Beta (Feature Complete, Production Tested)  |
 | **Vision**        | A single-user, AI-augmented fitness platform that treats logged data as the source of truth and the AI coach as an evidence-based analyst — not a generic motivator. |
 | **Mission**       | Give one user (Abdullah Mansuri) a premium, local-first fitness dashboard that unifies nutrition, weight, workout tracking, goal management, and an AI coach powered by historical context. |
 | **Product Category**| Personal Fitness Tracker + AI Coach (Single-User SPA) |
@@ -51,9 +51,8 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Master Password Auth** | bcrypt-hashed local password with recovery phrase. Persisted to localStorage. Generates and persists a syncToken to authorize client sync operations. No Supabase Auth. |
-| **First-Run Setup Wizard** | 3-step onboarding: name → password → recovery phrase. Creates profile. |
-| **Lock Screen** | Password gate on every app launch. Recovery flow for forgotten passwords. |
+| **Single-Owner Auth** | Password entry dynamically computes a deterministic SHA-256 syncToken used for pairing. No setup wizard is used; the Lock Screen handles initial creation or multi-device pairing on first load. |
+| **Lock Screen** | Password gate on every app launch. Backwards-compatible token migration updates old UUID clients to SHA-256 automatically. |
 | **Dashboard** | Unified overview: weight stats, calorie/protein progress bars, active goal, recent workout, AI brief, macro breakdown, quick actions. |
 | **Food Tracking** | Three logging modes: AI chat parse, Open Food Facts search, manual entry. Diary view grouped by meal type (breakfast/lunch/dinner/snack). Date picker. |
 | **AI Food Parsing** | Natural language → structured nutrition via Groq LLM. Confidence scoring. Manual confirmation before logging. |
@@ -77,6 +76,8 @@
 | **Responsive Layout** | Desktop sidebar + mobile bottom nav. Hamburger menu for mobile. CSS-based responsive breakpoints. |
 | **Body Measurements & Recomposition** | Log circumferences (chest, waist, limbs, neck, hips) and body weight. Includes deterministic classification status (fat loss, bulk, recomp, cut safety), charts, timeline history, and AI Coach context injections. Fully supports Metric and Imperial systems. |
 | **Adaptive Nutrition & Goal Intelligence** | Deterministic, rule-based recommendation engine adjusting calories (±150 kcal adjustments) and protein (1.6-2.4 g/kg bodyweight targets) based on weight trends, waist adjustments, strength logs, and macro diary adherence rates. Integrates a Dashboard status widget, dedicated progress charts/logs sub-tab, and AI Coach prompt context. |
+| **Backup & Recovery System** | Export full state JSON backup, import/restore and auto-sync, or download raw SQL database snapshots from settings. |
+| **Tombstone Deletion Sync** | Tracks local deletions using tombstone ID lists. Sync engine propagates deletions to Supabase and prunes tombstones on success. |
 
 ### 🟡 Partially Implemented
 
@@ -93,7 +94,7 @@
 
 | Feature | Notes |
 |---------|-------|
-| **Data Export/Import** | No CSV/JSON export or import |
+| **Data Export/Import (Completed)** | Full local JSON backup export/restore and Supabase snapshot downloads |
 | **Nutrition Charts** | No weekly/monthly nutrition trend charts |
 | **Workout Analytics** | No volume/frequency/PR trend charts |
 | **Body Fat Estimation** | `bodyFatPct` field exists on WeightLog but unused |

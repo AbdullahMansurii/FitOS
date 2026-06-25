@@ -4,7 +4,6 @@ import { useAuthStore } from '@/store/authStore'
 import { AppShell } from '@/components/layout/AppShell'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { LockScreen } from '@/pages/Auth/LockScreen'
-import { SetupScreen } from '@/pages/Auth/SetupScreen'
 import { Dashboard } from '@/pages/Dashboard/Dashboard'
 import { FoodPage } from '@/pages/Food/FoodPage'
 import { WorkoutPage } from '@/pages/Workout/WorkoutPage'
@@ -15,12 +14,9 @@ import { MeasurementsPage } from '@/pages/Measurements/MeasurementsPage'
 import { pullAll, schedulePush, isSupabaseReachable } from '@/lib/sync'
 import { seedUserContext } from '@/lib/contextSeed'
 
-// ─── Auth Gate ─────────────────────────────────────────────────────────────
-
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSetup, isUnlocked } = useAuthStore()
-  if (!isSetup) return <SetupScreen />
-  if (!isUnlocked) return <LockScreen />
+  if (!isSetup || !isUnlocked) return <LockScreen />
   return <>{children}</>
 }
 

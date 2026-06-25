@@ -52,8 +52,6 @@ function setState(updates: Partial<SyncState>) {
   _listeners.forEach((l) => l(_syncState))
 }
 
-// ─── Push: local → Supabase ────────────────────────────────────────────────
-
 export async function pushAll(): Promise<boolean> {
   backupWorkoutStore()
   setState({ status: 'syncing', error: null })
@@ -187,10 +185,20 @@ export async function pushAll(): Promise<boolean> {
     }
 
     const { deletedTemplateIds, deletedExerciseIds } = useWorkoutStore.getState()
+    const { deletedGoalIds } = useGoalsStore.getState()
+    const { deletedWeightLogIds, deletedMeasurementIds } = useWeightStore.getState()
+    const { deletedFoodLogIds } = useFoodStore.getState()
+    const { deletedMemoryIds } = useMemoryStore.getState()
+
     let successfullyDeletedExerciseIds: string[] = []
     let successfullyDeletedTemplateIds: string[] = []
+    let successfullyDeletedGoalIds: string[] = []
+    let successfullyDeletedWeightLogIds: string[] = []
+    let successfullyDeletedMeasurementIds: string[] = []
+    let successfullyDeletedFoodLogIds: string[] = []
+    let successfullyDeletedMemoryIds: string[] = []
 
-    // Exercises deletion sync (Option C: immediate deletion via local tombstones)
+    // Exercises deletion sync
     const deleteExercisesOp = (async () => {
       try {
         if (deletedExerciseIds.length > 0) {
@@ -206,7 +214,7 @@ export async function pushAll(): Promise<boolean> {
     })()
     ops.push(deleteExercisesOp as unknown as Promise<SyncResult>)
 
-    // Workout Templates deletion sync (Option C: immediate deletion via local tombstones)
+    // Workout Templates deletion sync
     const deleteTemplatesOp = (async () => {
       try {
         if (deletedTemplateIds.length > 0) {
@@ -221,6 +229,86 @@ export async function pushAll(): Promise<boolean> {
       }
     })()
     ops.push(deleteTemplatesOp as unknown as Promise<SyncResult>)
+
+    // Goals deletion sync
+    const deleteGoalsOp = (async () => {
+      try {
+        if (deletedGoalIds.length > 0) {
+          const { error: delErr } = await supabase.from('goals').delete().in('id', deletedGoalIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedGoalIds = [...deletedGoalIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync goal deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteGoalsOp as unknown as Promise<SyncResult>)
+
+    // Weight logs deletion sync
+    const deleteWeightLogsOp = (async () => {
+      try {
+        if (deletedWeightLogIds.length > 0) {
+          const { error: delErr } = await supabase.from('weight_logs').delete().in('id', deletedWeightLogIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedWeightLogIds = [...deletedWeightLogIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync weight log deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteWeightLogsOp as unknown as Promise<SyncResult>)
+
+    // Measurements deletion sync
+    const deleteMeasurementsOp = (async () => {
+      try {
+        if (deletedMeasurementIds.length > 0) {
+          const { error: delErr } = await supabase.from('measurements').delete().in('id', deletedMeasurementIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedMeasurementIds = [...deletedMeasurementIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync measurement deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteMeasurementsOp as unknown as Promise<SyncResult>)
+
+    // Food logs deletion sync
+    const deleteFoodLogsOp = (async () => {
+      try {
+        if (deletedFoodLogIds.length > 0) {
+          const { error: delErr } = await supabase.from('food_logs').delete().in('id', deletedFoodLogIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedFoodLogIds = [...deletedFoodLogIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync food log deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteFoodLogsOp as unknown as Promise<SyncResult>)
+
+    // Memories deletion sync
+    const deleteMemoriesOp = (async () => {
+      try {
+        if (deletedMemoryIds.length > 0) {
+          const { error: delErr } = await supabase.from('memories').delete().in('id', deletedMemoryIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedMemoryIds = [...deletedMemoryIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync memory deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteMemoriesOp as unknown as Promise<SyncResult>)
 
     // Memories (approved only)
     const approvedMemories = memories.filter((m) => m.isApproved)
@@ -242,6 +330,31 @@ export async function pushAll(): Promise<boolean> {
       useWorkoutStore.setState((s) => ({
         deletedExerciseIds: s.deletedExerciseIds.filter(id => !successfullyDeletedExerciseIds.includes(id)),
         deletedTemplateIds: s.deletedTemplateIds.filter(id => !successfullyDeletedTemplateIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedGoalIds.length > 0) {
+      useGoalsStore.setState((s) => ({
+        deletedGoalIds: s.deletedGoalIds.filter(id => !successfullyDeletedGoalIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedWeightLogIds.length > 0) {
+      useWeightStore.setState((s) => ({
+        deletedWeightLogIds: s.deletedWeightLogIds.filter(id => !successfullyDeletedWeightLogIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedMeasurementIds.length > 0) {
+      useWeightStore.setState((s) => ({
+        deletedMeasurementIds: s.deletedMeasurementIds.filter(id => !successfullyDeletedMeasurementIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedFoodLogIds.length > 0) {
+      useFoodStore.setState((s) => ({
+        deletedFoodLogIds: s.deletedFoodLogIds.filter(id => !successfullyDeletedFoodLogIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedMemoryIds.length > 0) {
+      useMemoryStore.setState((s) => ({
+        deletedMemoryIds: s.deletedMemoryIds.filter(id => !successfullyDeletedMemoryIds.includes(id)),
       }))
     }
 
@@ -268,6 +381,11 @@ export async function pullAll(): Promise<boolean> {
   backupWorkoutStore()
   setState({ status: 'syncing', error: null })
   try {
+    const { deletedGoalIds } = useGoalsStore.getState()
+    const { deletedWeightLogIds, deletedMeasurementIds } = useWeightStore.getState()
+    const { deletedFoodLogIds } = useFoodStore.getState()
+    const { deletedMemoryIds } = useMemoryStore.getState()
+
     const [
       profileRes,
       goalsRes,
@@ -314,28 +432,30 @@ export async function pullAll(): Promise<boolean> {
 
     // Goals
     if (goalsRes.data?.length) {
-      const goals: Goal[] = goalsRes.data.map((row) => ({
+      const parsedGoals: Goal[] = goalsRes.data.map((row) => ({
         id: row.id, name: row.name, type: row.type, status: row.status,
         startDate: row.start_date, targetDate: row.target_date,
         startWeight: row.start_weight, targetWeight: row.target_weight,
         calorieTarget: row.calorie_target, proteinTarget: row.protein_target,
         notes: row.notes, createdAt: row.created_at, updatedAt: row.updated_at,
       }))
+      const goals = parsedGoals.filter((g) => !deletedGoalIds.includes(g.id))
       useGoalsStore.setState({ goals })
     }
 
     // Weight logs
     if (weightRes.data?.length) {
-      const logs: WeightLog[] = weightRes.data.map((row) => ({
+      const parsedLogs: WeightLog[] = weightRes.data.map((row) => ({
         id: row.id, date: row.date, weightKg: row.weight_kg,
         notes: row.notes, createdAt: row.created_at,
       }))
+      const logs = parsedLogs.filter((w) => !deletedWeightLogIds.includes(w.id))
       useWeightStore.setState({ logs })
     }
 
     // Measurements
     if (measurementsRes.data?.length) {
-      const measurements: Measurement[] = measurementsRes.data.map((row) => {
+      const parsedMeasurements: Measurement[] = measurementsRes.data.map((row) => {
         let weightKg: number | undefined
         let leftArmCm: number | undefined
         let rightArmCm: number | undefined
@@ -384,17 +504,19 @@ export async function pullAll(): Promise<boolean> {
           notes: notes || undefined
         }
       })
+      const measurements = parsedMeasurements.filter((m) => !deletedMeasurementIds.includes(m.id))
       useWeightStore.setState({ measurements })
     }
 
     // Food logs
     if (foodRes.data?.length) {
-      const foodLogs: FoodLog[] = foodRes.data.map((row) => ({
+      const parsedFoodLogs: FoodLog[] = foodRes.data.map((row) => ({
         id: row.id, date: row.date, mealType: row.meal_type, name: row.name,
         quantityG: row.quantity_g, calories: row.calories, protein: row.protein,
         carbs: row.carbs, fat: row.fat,
         foodItemId: row.food_item_id, createdAt: row.created_at,
       }))
+      const foodLogs = parsedFoodLogs.filter((f) => !deletedFoodLogIds.includes(f.id))
       useFoodStore.setState({ foodLogs })
     }
 
@@ -504,13 +626,14 @@ export async function pullAll(): Promise<boolean> {
 
     // Memories
     if (memoriesRes.data?.length) {
-      const memories: Memory[] = memoriesRes.data.map((row) => ({
+      const parsedMemories: Memory[] = memoriesRes.data.map((row) => ({
         id: row.id, category: row.category, title: row.title, content: row.content,
         source: (row.source as 'ai' | 'manual'),
         confidenceScore: row.confidence_score,
         tags: row.tags ?? [], isApproved: row.is_approved,
         createdAt: row.created_at, updatedAt: row.updated_at,
       }))
+      const memories = parsedMemories.filter((m) => !deletedMemoryIds.includes(m.id))
       useMemoryStore.setState((s) => ({ ...s, memories }))
     }
 

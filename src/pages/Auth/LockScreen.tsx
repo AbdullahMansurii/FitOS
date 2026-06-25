@@ -3,7 +3,7 @@ import { Zap, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 export function LockScreen() {
-  const { unlock, resetWithRecovery } = useAuthStore()
+  const { isSetup, unlock, resetWithRecovery } = useAuthStore()
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -18,7 +18,7 @@ export function LockScreen() {
     setError('')
     const ok = await unlock(password)
     if (!ok) {
-      setError('Incorrect password')
+      setError(isSetup ? 'Incorrect password' : 'Incorrect password or connection issue')
       setPassword('')
     }
     setLoading(false)
@@ -60,7 +60,11 @@ export function LockScreen() {
             FitOS
           </h1>
           <p style={{ color: 'var(--text-muted)', marginTop: 6, fontSize: 14 }}>
-            {showRecovery ? 'Reset with recovery phrase' : 'Enter your password to continue'}
+            {showRecovery 
+              ? 'Reset with recovery phrase' 
+              : isSetup 
+                ? 'Enter your password to continue' 
+                : 'Enter master password to pair this device'}
           </p>
         </div>
 
@@ -71,7 +75,7 @@ export function LockScreen() {
                 <input
                   className="input"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Master Password"
+                  placeholder={isSetup ? "Master Password" : "Enter Master Password"}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError('') }}
                   onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
@@ -94,14 +98,18 @@ export function LockScreen() {
                 disabled={loading || !password}
                 style={{ width: '100%' }}
               >
-                {loading ? 'Unlocking...' : 'Unlock'}
+                {loading 
+                  ? (isSetup ? 'Unlocking...' : 'Pairing...') 
+                  : (isSetup ? 'Unlock' : 'Unlock & Pair Device')}
               </button>
-              <button
-                onClick={() => { setShowRecovery(true); setError('') }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', textAlign: 'center', textDecoration: 'underline' }}
-              >
-                Forgot password?
-              </button>
+              {isSetup && (
+                <button
+                  onClick={() => { setShowRecovery(true); setError('') }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', textAlign: 'center', textDecoration: 'underline' }}
+                >
+                  Forgot password?
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

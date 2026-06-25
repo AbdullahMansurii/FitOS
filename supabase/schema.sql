@@ -14,6 +14,7 @@ create table if not exists profiles (
   gender        text,
   avatar_url    text,
   sync_token    text,
+  is_master     boolean not null default true check (is_master = true) unique,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

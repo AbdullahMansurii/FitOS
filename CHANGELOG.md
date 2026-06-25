@@ -5,6 +5,19 @@
 
 ---
 
+## [1.0.0] — 2026-06-25
+
+### Added
+- **Deterministic Multi-Device Authentication:** Implemented lock-screen-first auth using client-side Web Crypto SHA-256 token derivation from the master password, eliminating setup onboarding wizards.
+- **Database Unique Profile Constraint:** Enforced a single-profile model via a SQL column constraint (`is_master BOOLEAN DEFAULT true CHECK (is_master = true) UNIQUE`) to guarantee a single row database-wide without hardcoding strings.
+- **Backup & Recovery System:** Added JSON backup export/import and cloud database snapshot downloads inside a new "Backup & Sync" settings tab.
+- **Tombstone Deletion Sync:** Integrated tombstone arrays to track local food, weight, measurement, goal, and memory deletions, propagating deletions to Supabase and pruning tombstones on success.
+
+### Fixed
+- **Weight Log Property Translation:** Corrected `weight_kg` vs `weightKg` mapping inside the sync engine `pushAll` database operations.
+- **React Hook Rules Compliance:** Moved backup state hooks to the top-level of `SettingsPage.tsx` component out of the tab callback closure to satisfy react-hooks/rules-of-hooks.
+- **Process Env Scope Safety:** Wrapped `process.env` calls in `src/lib/supabase.ts` with `globalThis` properties to pass browser build compilation checks.
+
 ## [0.9.0-alpha] — 2026-06-25
 
 ### Fixed

@@ -56,7 +56,7 @@
 | File | Lines | Risk | Purpose | Key Exports |
 |------|-------|------|---------|-------------|
 | [src/store/index.ts](file:///d:/FitOS/src/store/index.ts) | 541 | 🔴 | Zustand stores (all domain state, sync trigger) | `useProfileStore`, `useGoalsStore`, `useWeightStore`, `useFoodStore`, `useWorkoutStore`, `useMemoryStore`, `useChatStore`, `useSettingsStore`, `useUIStore` |
-| [src/store/authStore.ts](file:///d:/FitOS/src/store/authStore.ts) | 80 | 🔴 | Authentication store (bcrypt) | `useAuthStore` |
+| [src/store/authStore.ts](file:///d:/FitOS/src/store/authStore.ts) | 207 | 🔴 | Authentication store (bcrypt + deterministic Web Crypto SHA-256 token) | `useAuthStore`, `deriveSyncToken` |
 
 ---
 
@@ -65,7 +65,7 @@
 | File | Lines | Risk | Purpose | Key Exports |
 |------|-------|------|---------|-------------|
 | [src/lib/ai.ts](file:///d:/FitOS/src/lib/ai.ts) | 332 | 🔴 | AI provider interface, GroqProvider, system prompt builder | `AIProviderInterface`, `createAIProvider`, `buildSystemPrompt`, `extractMemorySuggestions`, `FitnessContext` |
-| [src/lib/sync.ts](file:///d:/FitOS/src/lib/sync.ts) | 557 | 🔴 | Supabase bidirectional sync engine | `pushAll`, `pullAll`, `schedulePush`, `isSupabaseReachable`, `getSyncState`, `onSyncStateChange` |
+| [src/lib/sync.ts](file:///d:/FitOS/src/lib/sync.ts) | 680 | 🔴 | Supabase bidirectional sync engine with tombstones | `pushAll`, `pullAll`, `schedulePush`, `isSupabaseReachable`, `getSyncState`, `onSyncStateChange` |
 | [src/lib/syncEvents.ts](file:///d:/FitOS/src/lib/syncEvents.ts) | 26 | 🔴 | Event bridge (stores→sync, circular dep breaker) | `registerSchedulePush`, `notifySync` |
 | [src/lib/supabase.ts](file:///d:/FitOS/src/lib/supabase.ts) | 77 | 🟡 | Supabase client + table helpers | `supabase`, `db`, `checkSupabaseConnection` |
 | [src/lib/contextSeed.ts](file:///d:/FitOS/src/lib/contextSeed.ts) | 189 | 🟡 | Abdullah's personal context seeder | `seedUserContext` |
@@ -118,7 +118,6 @@
 
 | File | Lines | Risk | Route | Sub-components | Dependencies |
 |------|-------|------|-------|---------------|-------------|
-| [src/pages/Auth/SetupScreen.tsx](file:///d:/FitOS/src/pages/Auth/SetupScreen.tsx) | 231 | 🟡 | (auth gate) | — | `authStore`, `useProfileStore`, `utils` |
 | [src/pages/Auth/LockScreen.tsx](file:///d:/FitOS/src/pages/Auth/LockScreen.tsx) | 145 | 🟡 | (auth gate) | — | `authStore` |
 | [src/pages/Dashboard/Dashboard.tsx](file:///d:/FitOS/src/pages/Dashboard/Dashboard.tsx) | 421 | 🟡 | `/dashboard` | — | `useGoalsStore`, `useWeightStore`, `useFoodStore`, `useWorkoutStore`, `useMemoryStore`, `useProfileStore`, `useSettingsStore`, `ai.ts`, `utils` |
 | [src/pages/Food/FoodPage.tsx](file:///d:/FitOS/src/pages/Food/FoodPage.tsx) | 796 | 🟡 | `/food` | `FoodSearchResult` | `useFoodStore`, `useGoalsStore`, `useSettingsStore`, `ai.ts`, `foodApi.ts`, `MacroRing`, `foodMapper.ts` |
@@ -126,7 +125,7 @@
 | [src/pages/Progress/ProgressPage.tsx](file:///d:/FitOS/src/pages/Progress/ProgressPage.tsx) | 233 | 🟡 | `/progress` | `CustomTooltip` | `useGoalsStore`, `useWeightStore`, `recharts`, `WeightLogModal`, `GoalSetupModal`, `utils` |
 | [src/pages/Measurements/MeasurementsPage.tsx](file:///d:/FitOS/src/pages/Measurements/MeasurementsPage.tsx) | 400 | 🟡 | `/measurements` | `MeasurementHistory`, `MeasurementModal` | `useWeightStore`, `useSettingsStore`, `utils` |
 | [src/pages/Coach/CoachPage.tsx](file:///d:/FitOS/src/pages/Coach/CoachPage.tsx) | 337 | 🟡 | `/coach` | — | `useGoalsStore`, `useWeightStore`, `useFoodStore`, `useWorkoutStore`, `useMemoryStore`, `useProfileStore`, `useSettingsStore`, `useChatStore`, `ai.ts`, `utils` |
-| [src/pages/Settings/SettingsPage.tsx](file:///d:/FitOS/src/pages/Settings/SettingsPage.tsx) | 293 | 🟢 | `/settings` | — | `useSettingsStore`, `useProfileStore`, `authStore` |
+| [src/pages/Settings/SettingsPage.tsx](file:///d:/FitOS/src/pages/Settings/SettingsPage.tsx) | 505 | 🟢 | `/settings` | — | `useSettingsStore`, `useProfileStore`, `authStore` |
 
 ---
 

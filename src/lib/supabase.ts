@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = (import.meta.env?.VITE_SUPABASE_URL || '') as string
-const supabaseAnonKey = (import.meta.env?.VITE_SUPABASE_ANON_KEY || '') as string
+const supabaseUrl = (import.meta.env?.VITE_SUPABASE_URL || (globalThis as typeof globalThis & { process?: { env?: Record<string, string> } }).process?.env?.VITE_SUPABASE_URL || '') as string
+const supabaseAnonKey = (import.meta.env?.VITE_SUPABASE_ANON_KEY || (globalThis as typeof globalThis & { process?: { env?: Record<string, string> } }).process?.env?.VITE_SUPABASE_ANON_KEY || '') as string
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('[FitOS] Supabase env vars missing — running in local-only mode')

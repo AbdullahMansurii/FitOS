@@ -12,9 +12,7 @@ npm install        # Install dependencies
 npm run dev        # Start Vite dev server on localhost:5173
 ```
 
-Default password on first run: Set during the setup wizard.
-
-To skip the setup wizard (if localStorage is empty), you'll need to complete the 3-step onboarding: enter a name, set a password (min 6 chars), and save the recovery phrase.
+Default password on first run: Enter your master password on the Lock Screen. If the database is empty, this password becomes your master password. If the database is already populated, entering this password derives the pairing syncToken to pull your cloud profile.
 
 ---
 
@@ -34,7 +32,7 @@ A **single-user, local-first fitness tracker** with an AI coach. It tracks nutri
 
 3. **No backend server.** All API calls (Groq, Open Food Facts, Supabase) are made directly from the browser.
 
-4. **Single-user assumption with RLS security.** No multi-tenant database. Row Level Security (RLS) is enabled across all 12 tables in Supabase. Queries from the frontend are authenticated by passing a client-side sync token inside the custom `x-fitos-auth` HTTP header. This header is validated by database policies against the token saved in the single-row `profiles` table.
+4. **Single-user assumption with RLS security.** No multi-tenant database. Row Level Security (RLS) is enabled across all tables in Supabase. Queries from the frontend are authenticated by passing a client-side sync token inside the custom `x-fitos-auth` HTTP header. This header is validated by database policies against the token saved in the single-row `profiles` table. The single-row limit is strictly enforced via a PostgreSQL column constraint (`is_master BOOLEAN DEFAULT true CHECK (is_master = true) UNIQUE`).
 
 5. **Sync is full-table.** Push = upsert everything. Pull = replace everything. No incremental sync.
 
@@ -72,7 +70,6 @@ A **single-user, local-first fitness tracker** with an AI coach. It tracks nutri
 | `/coach` | `src/pages/Coach/CoachPage.tsx` |
 | `/settings` | `src/pages/Settings/SettingsPage.tsx` |
 | Lock Screen | `src/pages/Auth/LockScreen.tsx` |
-| Setup Wizard | `src/pages/Auth/SetupScreen.tsx` |
 
 ### Shared Components
 | Component | File |

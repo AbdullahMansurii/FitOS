@@ -34,6 +34,7 @@ export const useProfileStore = create<ProfileState>()(
 
 interface GoalsState {
   goals: Goal[]
+  deletedGoalIds: string[]
   addGoal: (g: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Goal
   updateGoal: (id: string, updates: Partial<Goal>) => void
   deleteGoal: (id: string) => void
@@ -44,6 +45,7 @@ export const useGoalsStore = create<GoalsState>()(
   persist(
     (set, get) => ({
       goals: [],
+      deletedGoalIds: [],
       addGoal: (data) => {
         const goal: Goal = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
         set((s) => ({ goals: [...s.goals, goal] }))
@@ -51,7 +53,7 @@ export const useGoalsStore = create<GoalsState>()(
         return goal
       },
       updateGoal: (id, updates) => { set((s) => ({ goals: s.goals.map((g) => g.id === id ? { ...g, ...updates, updatedAt: new Date().toISOString() } : g) })); triggerSync() },
-      deleteGoal: (id) => { set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })); triggerSync() },
+      deleteGoal: (id) => { set((s) => ({ goals: s.goals.filter((g) => g.id !== id), deletedGoalIds: [...s.deletedGoalIds, id] })); triggerSync() },
       getActiveGoal: () => get().goals.find((g) => g.status === 'active') || null,
     }),
     { name: 'fitos-goals' }
@@ -62,13 +64,15 @@ export const useGoalsStore = create<GoalsState>()(
 
 interface WeightState {
   logs: WeightLog[]
+  measurements: Measurement[]
+  deletedWeightLogIds: string[]
+  deletedMeasurementIds: string[]
   addLog: (data: Omit<WeightLog, 'id' | 'createdAt'>) => void
   updateLog: (id: string, updates: Partial<WeightLog>) => void
   deleteLog: (id: string) => void
   getLatest: () => WeightLog | null
   getByDate: (date: string) => WeightLog | null
   getRange: (from: string, to: string) => WeightLog[]
-  measurements: Measurement[]
   addMeasurement: (m: Omit<Measurement, 'id'>) => void
   updateMeasurement: (id: string, updates: Partial<Measurement>) => void
   deleteMeasurement: (id: string) => void
@@ -79,6 +83,8 @@ export const useWeightStore = create<WeightState>()(
     (set, get) => ({
       logs: [],
       measurements: [],
+      deletedWeightLogIds: [],
+      deletedMeasurementIds: [],
       addLog: (data) => {
         const log: WeightLog = { ...data, id: generateId(), createdAt: new Date().toISOString() }
         set((s) => {
@@ -88,7 +94,7 @@ export const useWeightStore = create<WeightState>()(
         triggerSync()
       },
       updateLog: (id, updates) => { set((s) => ({ logs: s.logs.map((l) => l.id === id ? { ...l, ...updates } : l) })); triggerSync() },
-      deleteLog: (id) => { set((s) => ({ logs: s.logs.filter((l) => l.id !== id) })); triggerSync() },
+      deleteLog: (id) => { set((s) => ({ logs: s.logs.filter((l) => l.id !== id), deletedWeightLogIds: [...s.deletedWeightLogIds, id] })); triggerSync() },
       getLatest: () => {
         const sorted = [...get().logs].sort((a, b) => b.date.localeCompare(a.date))
         return sorted[0] || null
@@ -110,7 +116,8 @@ export const useWeightStore = create<WeightState>()(
       },
       deleteMeasurement: (id) => {
         set((s) => ({
-          measurements: s.measurements.filter((m) => m.id !== id)
+          measurements: s.measurements.filter((m) => m.id !== id),
+          deletedMeasurementIds: [...s.deletedMeasurementIds, id]
         }))
         triggerSync()
       },
@@ -125,6 +132,7 @@ interface FoodState {
   foodItems: FoodItem[]
   foodLogs: FoodLog[]
   savedMeals: SavedMeal[]
+  deletedFoodLogIds: string[]
   addFoodItem: (item: Omit<FoodItem, 'id'>) => FoodItem
   updateFoodItem: (id: string, updates: Partial<FoodItem>) => void
   deleteFoodItem: (id: string) => void
@@ -143,6 +151,7 @@ export const useFoodStore = create<FoodState>()(
       foodItems: [],
       foodLogs: [],
       savedMeals: [],
+      deletedFoodLogIds: [],
       addFoodItem: (data) => {
         const item: FoodItem = { ...data, id: generateId() }
         set((s) => ({ foodItems: [...s.foodItems, item] }))
@@ -159,7 +168,7 @@ export const useFoodStore = create<FoodState>()(
         return log
       },
       updateFoodLog: (id, updates) => { set((s) => ({ foodLogs: s.foodLogs.map((l) => l.id === id ? { ...l, ...updates } : l) })); triggerSync() },
-      deleteFoodLog: (id) => { set((s) => ({ foodLogs: s.foodLogs.filter((l) => l.id !== id) })); triggerSync() },
+      deleteFoodLog: (id) => { set((s) => ({ foodLogs: s.foodLogs.filter((l) => l.id !== id), deletedFoodLogIds: [...s.deletedFoodLogIds, id] })); triggerSync() },
       getLogsByDate: (date) => get().foodLogs.filter((l) => l.date === date),
       addSavedMeal: (data) => {
         const meal: SavedMeal = { ...data, id: generateId(), createdAt: new Date().toISOString() }
@@ -409,6 +418,7 @@ export const useWorkoutStore = create<WorkoutState>()(
 interface MemoryState {
   memories: Memory[]
   pendingSuggestions: Memory[]
+  deletedMemoryIds: string[]
   addMemory: (m: Omit<Memory, 'id' | 'createdAt' | 'updatedAt'>) => void
   approveMemory: (id: string) => void
   rejectMemory: (id: string) => void
@@ -422,6 +432,7 @@ export const useMemoryStore = create<MemoryState>()(
     (set) => ({
       memories: [],
       pendingSuggestions: [],
+      deletedMemoryIds: [],
       addMemory: (data) => {
         const m: Memory = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
         set((s) => ({ memories: [m, ...s.memories] }))
@@ -437,9 +448,13 @@ export const useMemoryStore = create<MemoryState>()(
       rejectMemory: (id) => set((s) => ({
         pendingSuggestions: s.pendingSuggestions.filter((m) => m.id !== id)
       })),
-      deleteMemory: (id) => set((s) => ({
-        memories: s.memories.filter((m) => m.id !== id)
-      })),
+      deleteMemory: (id) => {
+        set((s) => ({
+          memories: s.memories.filter((m) => m.id !== id),
+          deletedMemoryIds: [...s.deletedMemoryIds, id]
+        }))
+        triggerSync()
+      },
       updateMemory: (id, updates) => set((s) => ({
         memories: s.memories.map((m) => m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m)
       })),
