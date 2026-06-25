@@ -22,10 +22,12 @@ envContent.split('\n').forEach(line => {
 const supabaseUrl = env['VITE_SUPABASE_URL']
 const supabaseAnonKey = env['VITE_SUPABASE_ANON_KEY']
 
+const syncToken = process.argv[2] || "<SYNC_TOKEN>"
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
-      'x-fitos-auth': '99c1eab1-d44b-4500-b421-15b4396d2b14'
+      'x-fitos-auth': syncToken
     }
   }
 })

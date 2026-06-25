@@ -37,7 +37,7 @@ Follow these steps when verifying the application in staging or local environmen
 
 ### Initial Device Pairing
 1. Open the app on a cleared browser/device.
-2. Enter the password `"Sumaiyya"` on the lock screen.
+2. Enter the password `<MASTER_PASSWORD>` on the lock screen.
 3. Verify that the app transitions to "Pairing..." and successfully redirects to the dashboard.
 4. Verify the console logs: `Profile found in SELECT, pairing device...`.
 

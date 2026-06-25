@@ -10,10 +10,12 @@ envContent.split('\n').forEach(line => {
   if (match) env[match[1]] = (match[2] || '').replace(/['"]/g, '').trim()
 })
 
+const syncToken = process.argv[2] || "<SYNC_TOKEN>"
+
 const supabase = createClient(env['VITE_SUPABASE_URL'], env['VITE_SUPABASE_ANON_KEY'], {
   global: {
     headers: {
-      'x-fitos-auth': 'caa8cf64e68f3cb7705bb3fc94876b056e104033373b1ec92921b100f9f676dd'
+      'x-fitos-auth': syncToken
     }
   }
 })
@@ -32,7 +34,7 @@ async function verify() {
   }
   
   const p = data[0]
-  if (p.is_master !== true || p.sync_token !== 'caa8cf64e68f3cb7705bb3fc94876b056e104033373b1ec92921b100f9f676dd') {
+  if (p.is_master !== true || p.sync_token !== syncToken) {
     console.error('\n❌ Verification Failed: Profile contents mismatch:', p)
     process.exit(1)
   }

@@ -11,7 +11,10 @@ async function deriveSyncToken(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-deriveSyncToken("Sumaiyya").then(token => {
-  console.log("Password: Sumaiyya")
+// You can pass the password as a command line argument: node hashGenerator.mjs <password>
+const password = process.argv[2] || "<MASTER_PASSWORD>";
+
+deriveSyncToken(password).then(token => {
+  console.log("Password:", password)
   console.log("Derived Token:", token)
 })
