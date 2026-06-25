@@ -4,17 +4,22 @@ import bcrypt from 'bcryptjs'
 import { setSupabaseAuthHeader, supabase } from '@/lib/supabase'
 import type { WeightUnit, EnergyUnit } from '@/types'
 
+export interface AuthResult {
+  success: boolean
+  error?: string
+}
+
 interface AuthState {
   isSetup: boolean
   isUnlocked: boolean
   passwordHash: string | null
   recoveryHash: string | null
   syncToken: string | null
-  setup: (password: string, recoveryPhrase: string) => Promise<void>
-  unlock: (password: string) => Promise<boolean>
+  setup: (password: string, recoveryPhrase: string) => Promise<AuthResult>
+  unlock: (password: string) => Promise<AuthResult>
   lock: () => void
-  changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>
-  resetWithRecovery: (phrase: string, newPassword: string) => Promise<boolean>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>
+  resetWithRecovery: (phrase: string, newPassword: string) => Promise<AuthResult>
 }
 
 export async function deriveSyncToken(password: string): Promise<string> {
@@ -36,11 +41,18 @@ export const useAuthStore = create<AuthState>()(
       syncToken: null,
 
       setup: async (password, recoveryPhrase) => {
-        const passwordHash = await bcrypt.hash(password, 10)
-        const recoveryHash = await bcrypt.hash(recoveryPhrase.toLowerCase().trim(), 10)
-        const syncToken = await deriveSyncToken(password)
-        setSupabaseAuthHeader(syncToken)
-        set({ isSetup: true, isUnlocked: true, passwordHash, recoveryHash, syncToken })
+        try {
+          const passwordHash = await bcrypt.hash(password, 10)
+          const recoveryHash = await bcrypt.hash(recoveryPhrase.toLowerCase().trim(), 10)
+          const syncToken = await deriveSyncToken(password)
+          setSupabaseAuthHeader(syncToken)
+          set({ isSetup: true, isUnlocked: true, passwordHash, recoveryHash, syncToken })
+          return { success: true }
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error('[FitOS Auth] Setup failed:', errMsg)
+          return { success: false, error: errMsg }
+        }
       },
 
       unlock: async (password) => {
@@ -53,28 +65,44 @@ export const useAuthStore = create<AuthState>()(
           if (ok) {
             // Migrate database if device uses old random sync token format
             if (syncToken !== derivedToken) {
-              try {
-                const { useProfileStore } = await import('./index')
-                const profileId = useProfileStore.getState().profile?.id
-                if (profileId) {
-                  // Temporarily authorize with old token to write new token
-                  setSupabaseAuthHeader(syncToken || '')
-                  await supabase.from('profiles').update({ sync_token: derivedToken }).eq('id', profileId)
+              const { useProfileStore } = await import('./index')
+              const profileId = useProfileStore.getState().profile?.id
+              if (profileId) {
+                // Temporarily authorize with old token to write new token
+                setSupabaseAuthHeader(syncToken || '')
+                const { error } = await supabase
+                  .from('profiles')
+                  .update({ sync_token: derivedToken })
+                  .eq('id', profileId)
+
+                if (error) {
+                  console.error('[FitOS Auth] Token migration failed:', error.message)
+                  return { success: false, error: `Security Migration Failed: ${error.message}` }
                 }
-              } catch (err) {
-                console.warn('[FitOS Auth] Token migration failed — proceeding offline:', err)
+              } else {
+                console.warn('[FitOS Auth] Profile ID missing during token migration.')
               }
             }
             setSupabaseAuthHeader(derivedToken)
             set({ isUnlocked: true, syncToken: derivedToken })
+            return { success: true }
           }
-          return ok
+          return { success: false, error: 'Incorrect password' }
         }
 
         // Case B: No local store credentials (new device pairing/initial setup)
         setSupabaseAuthHeader(derivedToken)
         try {
-          const { data: profileRow } = await supabase.from('profiles').select('*').limit(1).maybeSingle()
+          const { data: profileRow, error: fetchErr } = await supabase
+            .from('profiles')
+            .select('*')
+            .limit(1)
+            .maybeSingle()
+          
+          if (fetchErr) {
+            console.error('[FitOS Auth] Profile fetch failed:', fetchErr.message)
+            return { success: false, error: `Database Connection Failed: ${fetchErr.message}` }
+          }
           
           if (profileRow) {
             // Pairing success: Profile found with matching derived token
@@ -98,7 +126,7 @@ export const useAuthStore = create<AuthState>()(
               passwordHash: newHash,
               syncToken: derivedToken
             })
-            return true
+            return { success: true }
           } else {
             // Either incorrect password (no profile matches derived token) OR DB is empty (first launch)
             const defaultId = crypto.randomUUID()
@@ -112,9 +140,12 @@ export const useAuthStore = create<AuthState>()(
             })
 
             if (insErr) {
-              // Violates single-row UNIQUE constraint (profile exists with different token) -> wrong password!
+              if (insErr.code === '23505') {
+                // Unique constraint violated -> profile already exists -> wrong password!
+                return { success: false, error: 'Incorrect password' }
+              }
               console.error('[FitOS Auth] Unique constraint violation on pairing insert:', insErr.message)
-              return false
+              return { success: false, error: `Pairing Failed: ${insErr.message} (${insErr.code})` }
             }
 
             // Database was empty: Initial launch setup success
@@ -135,11 +166,12 @@ export const useAuthStore = create<AuthState>()(
               passwordHash: newHash,
               syncToken: derivedToken
             })
-            return true
+            return { success: true }
           }
-        } catch (err) {
-          console.error('[FitOS Auth] Pairing/verify fetch failed:', err)
-          return false
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error('[FitOS Auth] Pairing/verify fetch failed:', errMsg)
+          return { success: false, error: errMsg }
         }
       },
 
@@ -147,50 +179,58 @@ export const useAuthStore = create<AuthState>()(
 
       changePassword: async (currentPassword, newPassword) => {
         const { passwordHash, syncToken } = get()
-        if (!passwordHash) return false
+        if (!passwordHash) return { success: false, error: 'Auth not initialized' }
         const ok = await bcrypt.compare(currentPassword, passwordHash)
-        if (!ok) return false
+        if (!ok) return { success: false, error: 'Current password is incorrect' }
         const newHash = await bcrypt.hash(newPassword, 10)
         const derivedToken = await deriveSyncToken(newPassword)
 
         const { useProfileStore } = await import('./index')
         const profileId = useProfileStore.getState().profile?.id
         if (profileId && syncToken) {
-          try {
-            setSupabaseAuthHeader(syncToken)
-            await supabase.from('profiles').update({ sync_token: derivedToken }).eq('id', profileId)
-          } catch (err) {
-            console.warn('[FitOS Auth] Change password DB update failed:', err)
+          setSupabaseAuthHeader(syncToken)
+          const { error } = await supabase
+            .from('profiles')
+            .update({ sync_token: derivedToken })
+            .eq('id', profileId)
+          
+          if (error) {
+            console.error('[FitOS Auth] Change password DB update failed:', error.message)
+            return { success: false, error: `Database update failed: ${error.message}` }
           }
         }
 
         setSupabaseAuthHeader(derivedToken)
         set({ passwordHash: newHash, syncToken: derivedToken })
-        return true
+        return { success: true }
       },
 
       resetWithRecovery: async (phrase, newPassword) => {
         const { recoveryHash, syncToken } = get()
-        if (!recoveryHash) return false
+        if (!recoveryHash) return { success: false, error: 'Recovery hash not set' }
         const ok = await bcrypt.compare(phrase.toLowerCase().trim(), recoveryHash)
-        if (!ok) return false
+        if (!ok) return { success: false, error: 'Invalid recovery phrase' }
         const newHash = await bcrypt.hash(newPassword, 10)
         const derivedToken = await deriveSyncToken(newPassword)
 
         const { useProfileStore } = await import('./index')
         const profileId = useProfileStore.getState().profile?.id
         if (profileId && syncToken) {
-          try {
-            setSupabaseAuthHeader(syncToken)
-            await supabase.from('profiles').update({ sync_token: derivedToken }).eq('id', profileId)
-          } catch (err) {
-            console.warn('[FitOS Auth] DB update after recovery reset failed:', err)
+          setSupabaseAuthHeader(syncToken)
+          const { error } = await supabase
+            .from('profiles')
+            .update({ sync_token: derivedToken })
+            .eq('id', profileId)
+
+          if (error) {
+            console.error('[FitOS Auth] DB update after recovery reset failed:', error.message)
+            return { success: false, error: `Database update failed: ${error.message}` }
           }
         }
 
         setSupabaseAuthHeader(derivedToken)
         set({ passwordHash: newHash, syncToken: derivedToken })
-        return true
+        return { success: true }
       },
     }),
     {

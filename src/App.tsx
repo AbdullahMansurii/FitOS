@@ -13,6 +13,7 @@ import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { MeasurementsPage } from '@/pages/Measurements/MeasurementsPage'
 import { pullAll, schedulePush, isSupabaseReachable } from '@/lib/sync'
 import { seedUserContext } from '@/lib/contextSeed'
+import { DiagnosticsPage } from '@/pages/Diagnostics/DiagnosticsPage'
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSetup, isUnlocked } = useAuthStore()
@@ -49,24 +50,29 @@ function SyncInit() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthGate>
-        <SyncInit />
-        <AppShell>
-          <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/food" element={<FoodPage />} />
-              <Route path="/workout" element={<WorkoutPage />} />
-              <Route path="/progress" element={<ProgressPage />} />
-              <Route path="/coach" element={<CoachPage />} />
-              <Route path="/measurements" element={<MeasurementsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </ErrorBoundary>
-        </AppShell>
-      </AuthGate>
+      <Routes>
+        <Route path="/diagnostics" element={<DiagnosticsPage />} />
+        <Route path="*" element={
+          <AuthGate>
+            <SyncInit />
+            <AppShell>
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/food" element={<FoodPage />} />
+                  <Route path="/workout" element={<WorkoutPage />} />
+                  <Route path="/progress" element={<ProgressPage />} />
+                  <Route path="/coach" element={<CoachPage />} />
+                  <Route path="/measurements" element={<MeasurementsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </ErrorBoundary>
+            </AppShell>
+          </AuthGate>
+        } />
+      </Routes>
     </BrowserRouter>
   )
 }

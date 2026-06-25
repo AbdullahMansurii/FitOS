@@ -200,9 +200,46 @@ $$;
 create policy "profile_insert_empty" on profiles
   for insert with check ((select count(*) from profiles) = 0);
 
-create policy "profile_token_access" on profiles
-  for all using (get_auth_token() = sync_token)
-  with check (get_auth_token() = sync_token);
+create policy "profile_select_access" on profiles
+  for select using (get_auth_token() = sync_token);
+
+create policy "profile_update_access" on profiles
+  for update using (get_auth_token() = sync_token) with check (true);
+
+-- Security Gate Trigger to ensure secure sync_token transition and parameter safety
+create or replace function verify_profile_update()
+returns trigger security definer language plpgsql as $$
+begin
+  -- A. Ensure the update caller possesses the current valid database token
+  if get_auth_token() is distinct from old.sync_token then
+    raise exception 'Unauthorized: Invalid authentication credentials';
+  end if;
+
+  -- B. Prevent modifications to the profile ID
+  if new.id is distinct from old.id then
+    raise exception 'Unauthorized: Profile ID cannot be modified';
+  end if;
+
+  -- C. Prevent modifying the master flag to anything other than true
+  if new.is_master is not true then
+    raise exception 'Unauthorized: Master flag cannot be modified';
+  end if;
+
+  -- D. Enforce that any token update must be a valid 64-character SHA-256 hex string
+  if new.sync_token is distinct from old.sync_token then
+    if new.sync_token is null or new.sync_token !~ '^[a-f0-9]{64}$' then
+      raise exception 'Invalid sync token format: Must be a 64-character SHA-256 hex string';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_security_gate on profiles;
+create trigger profiles_security_gate
+  before update on profiles
+  for each row execute function verify_profile_update();
 
 create policy "goals_token_access" on goals
   for all using (get_auth_token() = (select sync_token from profiles limit 1));

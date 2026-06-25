@@ -72,8 +72,8 @@ export function SettingsPage() {
     if (!currentPw || !newPw) { setPwError('Fill in all fields'); return }
     if (newPw.length < 6) { setPwError('New password must be at least 6 characters'); return }
     if (newPw !== confirmPw) { setPwError('Passwords do not match'); return }
-    const ok = await changePassword(currentPw, newPw)
-    if (!ok) { setPwError('Current password is incorrect'); return }
+    const result = await changePassword(currentPw, newPw)
+    if (!result.success) { setPwError(result.error || 'Current password is incorrect'); return }
     setPwSuccess(true)
     setCurrentPw(''); setNewPw(''); setConfirmPw('')
     setTimeout(() => setPwSuccess(false), 3000)

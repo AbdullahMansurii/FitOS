@@ -16,9 +16,9 @@ export function LockScreen() {
     if (!password) return
     setLoading(true)
     setError('')
-    const ok = await unlock(password)
-    if (!ok) {
-      setError(isSetup ? 'Incorrect password' : 'Incorrect password or connection issue')
+    const result = await unlock(password)
+    if (!result.success) {
+      setError(result.error || (isSetup ? 'Incorrect password' : 'Incorrect password or connection issue'))
       setPassword('')
     }
     setLoading(false)
@@ -29,9 +29,9 @@ export function LockScreen() {
     if (newPassword.length < 6) { setError('New password must be at least 6 characters'); return }
     setLoading(true)
     setError('')
-    const ok = await resetWithRecovery(recoveryPhrase, newPassword)
-    if (!ok) {
-      setError('Invalid recovery phrase')
+    const result = await resetWithRecovery(recoveryPhrase, newPassword)
+    if (!result.success) {
+      setError(result.error || 'Invalid recovery phrase')
     } else {
       await unlock(newPassword)
     }
