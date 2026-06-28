@@ -14,15 +14,17 @@ import {
   useWorkoutStore,
   useMemoryStore,
   useProfileStore,
+  useRecoveryStore,
+  usePhotosStore,
   backupWorkoutStore,
 } from '@/store/index'
 import { useAuthStore } from '@/store/authStore'
-import type { WeightLog, Goal, FoodLog, WorkoutSession, Memory, Profile, Exercise, WorkoutTemplate, Measurement } from '@/types'
+import type { WeightLog, Goal, FoodLog, WorkoutSession, Memory, Profile, Exercise, WorkoutTemplate, Measurement, SavedMeal, RecoveryLog, ProgressPhoto } from '@/types'
 import { SEEDED_EXERCISES, SEEDED_TEMPLATES } from '@/constants/seeds'
 
 // ─── Status tracking ───────────────────────────────────────────────────────
 
-export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error'
+export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline'
 
 interface SyncState {
   status: SyncStatus
@@ -54,14 +56,20 @@ function setState(updates: Partial<SyncState>) {
 
 export async function pushAll(): Promise<boolean> {
   backupWorkoutStore()
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    setState({ status: 'offline', error: null })
+    return false
+  }
   setState({ status: 'syncing', error: null })
   try {
     const { profile } = useProfileStore.getState()
     const { goals } = useGoalsStore.getState()
     const { logs: weightLogs, measurements } = useWeightStore.getState()
-    const { foodLogs } = useFoodStore.getState()
+    const { foodLogs, savedMeals, deletedSavedMealIds } = useFoodStore.getState()
     const { sessions, templates, exercises } = useWorkoutStore.getState()
     const { memories } = useMemoryStore.getState()
+    const { recoveryLogs, deletedRecoveryLogIds } = useRecoveryStore.getState()
+    const { photos, deletedPhotoIds } = usePhotosStore.getState()
 
     // Profile: Sequential upload first to establish RLS sync_token
     if (profile) {
@@ -93,6 +101,12 @@ export async function pushAll(): Promise<boolean> {
         start_weight: g.startWeight ?? null, target_weight: g.targetWeight ?? null,
         calorie_target: g.calorieTarget ?? null, protein_target: g.proteinTarget ?? null,
         notes: g.notes ?? null,
+        goal_mode: g.goalMode ?? 'fat_loss',
+        activity_level: g.activityLevel ?? 'moderately_active',
+        carb_target: g.carbTarget ?? null,
+        fat_target: g.fatTarget ?? null,
+        tdee_estimate: g.tdeeEstimate ?? null,
+        deficit_surplus: g.deficitSurplus ?? 0,
       }))
       ops.push(supabase.from('goals').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
     }
@@ -139,8 +153,53 @@ export async function pushAll(): Promise<boolean> {
         id: f.id, date: f.date, meal_type: f.mealType, name: f.name,
         quantity_g: f.quantityG, calories: f.calories, protein: f.protein,
         carbs: f.carbs, fat: f.fat, food_item_id: f.foodItemId ?? null,
+        protein_quality_score: f.proteinQualityScore ?? null,
+        protein_quality_method: f.proteinQualityMethod ?? 'none',
+        nutrition_source: f.nutritionSource ?? 'manual',
+        saved_meal_version: f.savedMealVersion ?? null,
       }))
       ops.push(supabase.from('food_logs').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
+    }
+
+    // Saved Meals
+    if (savedMeals.length) {
+      const rows = savedMeals.map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description ?? null,
+        items: m.items,
+        total_calories: m.totalCalories,
+        total_protein: m.totalProtein,
+        total_carbs: m.totalCarbs,
+        total_fat: m.totalFat,
+        category: m.category ?? 'custom',
+        total_fiber: m.totalFiber ?? 0,
+        protein_quality_score: m.proteinQualityScore ?? null,
+        protein_quality_method: m.proteinQualityMethod ?? 'none',
+        usage_count: m.usageCount ?? 0,
+        last_used_at: m.lastUsedAt ?? null,
+        version: m.version ?? 1,
+        parent_meal_id: m.parentMealId ?? null,
+        is_current: m.isCurrent ?? true,
+        updated_at: m.updatedAt ?? new Date().toISOString(),
+      }))
+      ops.push(supabase.from('saved_meals').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
+    }
+
+    // Recovery logs
+    if (recoveryLogs.length) {
+      const rows = recoveryLogs.map((r) => ({
+        id: r.id,
+        date: r.date,
+        daily_steps: r.dailySteps ?? null,
+        sleep_hours: r.sleepHours ?? null,
+        mood: r.mood ?? null,
+        energy: r.energy ?? null,
+        muscle_soreness: r.muscleSoreness ?? null,
+        notes: r.notes ?? null,
+        created_at: r.createdAt ?? new Date().toISOString(),
+      }))
+      ops.push(supabase.from('recovery_logs').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
     }
 
     // Workout sessions (exercises as JSONB)
@@ -197,6 +256,9 @@ export async function pushAll(): Promise<boolean> {
     let successfullyDeletedMeasurementIds: string[] = []
     let successfullyDeletedFoodLogIds: string[] = []
     let successfullyDeletedMemoryIds: string[] = []
+    let successfullyDeletedSavedMealIds: string[] = []
+    let successfullyDeletedRecoveryLogIds: string[] = []
+    let successfullyDeletedPhotoIds: string[] = []
 
     // Exercises deletion sync
     const deleteExercisesOp = (async () => {
@@ -294,6 +356,38 @@ export async function pushAll(): Promise<boolean> {
     })()
     ops.push(deleteFoodLogsOp as unknown as Promise<SyncResult>)
 
+    // Saved meals deletion sync
+    const deleteSavedMealsOp = (async () => {
+      try {
+        if (deletedSavedMealIds.length > 0) {
+          const { error: delErr } = await supabase.from('saved_meals').delete().in('id', deletedSavedMealIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedSavedMealIds = [...deletedSavedMealIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync saved meal deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteSavedMealsOp as unknown as Promise<SyncResult>)
+
+    // Recovery logs deletion sync
+    const deleteRecoveryLogsOp = (async () => {
+      try {
+        if (deletedRecoveryLogIds.length > 0) {
+          const { error: delErr } = await supabase.from('recovery_logs').delete().in('id', deletedRecoveryLogIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedRecoveryLogIds = [...deletedRecoveryLogIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync recovery log deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deleteRecoveryLogsOp as unknown as Promise<SyncResult>)
+
     // Memories deletion sync
     const deleteMemoriesOp = (async () => {
       try {
@@ -320,6 +414,35 @@ export async function pushAll(): Promise<boolean> {
       }))
       ops.push(supabase.from('memories').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
     }
+
+    // Progress Photos push
+    if (photos.length) {
+      const rows = photos.map((p) => ({
+        id: p.id,
+        date: p.date,
+        photo_type: p.photoType,
+        photo_data: p.photoData,
+        notes: p.notes ?? null,
+        created_at: p.createdAt ?? new Date().toISOString(),
+      }))
+      ops.push(supabase.from('progress_photos').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
+    }
+
+    // Progress Photos deletion sync
+    const deletePhotosOp = (async () => {
+      try {
+        if (deletedPhotoIds.length > 0) {
+          const { error: delErr } = await supabase.from('progress_photos').delete().in('id', deletedPhotoIds)
+          if (delErr) return { error: delErr }
+          successfullyDeletedPhotoIds = [...deletedPhotoIds]
+        }
+        return { error: null }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to sync photo deletions'
+        return { error: { message } }
+      }
+    })()
+    ops.push(deletePhotosOp as unknown as Promise<SyncResult>)
 
     const results = await Promise.all(ops)
     const firstError = results.find((r) => r?.error)?.error
@@ -352,6 +475,21 @@ export async function pushAll(): Promise<boolean> {
         deletedFoodLogIds: s.deletedFoodLogIds.filter(id => !successfullyDeletedFoodLogIds.includes(id)),
       }))
     }
+    if (successfullyDeletedSavedMealIds.length > 0) {
+      useFoodStore.setState((s) => ({
+        deletedSavedMealIds: s.deletedSavedMealIds.filter(id => !successfullyDeletedSavedMealIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedRecoveryLogIds.length > 0) {
+      useRecoveryStore.setState((s) => ({
+        deletedRecoveryLogIds: s.deletedRecoveryLogIds.filter(id => !successfullyDeletedRecoveryLogIds.includes(id)),
+      }))
+    }
+    if (successfullyDeletedPhotoIds.length > 0) {
+      usePhotosStore.setState((s) => ({
+        deletedPhotoIds: s.deletedPhotoIds.filter(id => !successfullyDeletedPhotoIds.includes(id)),
+      }))
+    }
     if (successfullyDeletedMemoryIds.length > 0) {
       useMemoryStore.setState((s) => ({
         deletedMemoryIds: s.deletedMemoryIds.filter(id => !successfullyDeletedMemoryIds.includes(id)),
@@ -359,7 +497,7 @@ export async function pushAll(): Promise<boolean> {
     }
 
     // Update sync metadata
-    const entityTypes = ['profiles','goals','weight_logs','food_logs','workout_sessions','memories','exercises','workout_templates','measurements']
+    const entityTypes = ['profiles','goals','weight_logs','food_logs','workout_sessions','memories','exercises','workout_templates','measurements','saved_meals','recovery_logs','progress_photos']
     await supabase.from('sync_metadata').upsert(
       entityTypes.map((t) => ({ entity_type: t, last_synced_at: new Date().toISOString() })),
       { onConflict: 'entity_type' }
@@ -379,12 +517,18 @@ export async function pushAll(): Promise<boolean> {
 
 export async function pullAll(): Promise<boolean> {
   backupWorkoutStore()
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    setState({ status: 'offline', error: null })
+    return false
+  }
   setState({ status: 'syncing', error: null })
   try {
     const { deletedGoalIds } = useGoalsStore.getState()
     const { deletedWeightLogIds, deletedMeasurementIds } = useWeightStore.getState()
-    const { deletedFoodLogIds } = useFoodStore.getState()
+    const { deletedFoodLogIds, deletedSavedMealIds } = useFoodStore.getState()
     const { deletedMemoryIds } = useMemoryStore.getState()
+    const { deletedRecoveryLogIds } = useRecoveryStore.getState()
+    const { deletedPhotoIds } = usePhotosStore.getState()
 
     const [
       profileRes,
@@ -396,6 +540,9 @@ export async function pullAll(): Promise<boolean> {
       exercisesRes,
       templatesRes,
       measurementsRes,
+      savedMealsRes,
+      recoveryRes,
+      photosRes,
     ] = await Promise.all([
       supabase.from('profiles').select('*').limit(1).maybeSingle(),
       supabase.from('goals').select('*').order('created_at', { ascending: true }),
@@ -406,6 +553,9 @@ export async function pullAll(): Promise<boolean> {
       supabase.from('exercises').select('*'),
       supabase.from('workout_templates').select('*'),
       supabase.from('measurements').select('*').order('date', { ascending: true }),
+      supabase.from('saved_meals').select('*').order('created_at', { ascending: true }),
+      supabase.from('recovery_logs').select('*').order('date', { ascending: true }),
+      supabase.from('progress_photos').select('*').order('date', { ascending: false }),
     ])
 
     // Merge profile
@@ -438,6 +588,9 @@ export async function pullAll(): Promise<boolean> {
         startWeight: row.start_weight, targetWeight: row.target_weight,
         calorieTarget: row.calorie_target, proteinTarget: row.protein_target,
         notes: row.notes, createdAt: row.created_at, updatedAt: row.updated_at,
+        goalMode: row.goal_mode, activityLevel: row.activity_level,
+        carbTarget: row.carb_target, fatTarget: row.fat_target,
+        tdeeEstimate: row.tdee_estimate, deficitSurplus: row.deficit_surplus,
       }))
       const goals = parsedGoals.filter((g) => !deletedGoalIds.includes(g.id))
       useGoalsStore.setState({ goals })
@@ -515,9 +668,75 @@ export async function pullAll(): Promise<boolean> {
         quantityG: row.quantity_g, calories: row.calories, protein: row.protein,
         carbs: row.carbs, fat: row.fat,
         foodItemId: row.food_item_id, createdAt: row.created_at,
+        proteinQualityScore: row.protein_quality_score,
+        proteinQualityMethod: row.protein_quality_method,
+        nutritionSource: row.nutrition_source,
+        savedMealVersion: row.saved_meal_version,
       }))
       const foodLogs = parsedFoodLogs.filter((f) => !deletedFoodLogIds.includes(f.id))
       useFoodStore.setState({ foodLogs })
+    }
+
+    // Saved Meals
+    if (savedMealsRes.data?.length) {
+      const currentSavedMeals = useFoodStore.getState().savedMeals
+      const pinnedMap = new Map(currentSavedMeals.map((m) => [m.id, m.isPinned]))
+
+      const parsedSavedMeals: SavedMeal[] = savedMealsRes.data.map((row) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        items: row.items ?? [],
+        totalCalories: row.total_calories,
+        totalProtein: row.total_protein,
+        totalCarbs: row.total_carbs,
+        totalFat: row.total_fat,
+        createdAt: row.created_at,
+        category: row.category,
+        totalFiber: row.total_fiber,
+        proteinQualityScore: row.protein_quality_score,
+        proteinQualityMethod: row.protein_quality_method,
+        usageCount: row.usage_count,
+        lastUsedAt: row.last_used_at,
+        version: row.version,
+        parentMealId: row.parent_meal_id,
+        isCurrent: row.is_current,
+        updatedAt: row.updated_at,
+        isPinned: pinnedMap.get(row.id) || false,
+      }))
+      const savedMeals = parsedSavedMeals.filter((m) => !deletedSavedMealIds.includes(m.id))
+      useFoodStore.setState({ savedMeals })
+    }
+
+    // Recovery logs
+    if (recoveryRes.data?.length) {
+      const parsedRecoveryLogs: RecoveryLog[] = recoveryRes.data.map((row) => ({
+        id: row.id,
+        date: row.date,
+        dailySteps: row.daily_steps,
+        sleepHours: row.sleep_hours,
+        mood: row.mood,
+        energy: row.energy,
+        muscleSoreness: row.muscle_soreness,
+        notes: row.notes,
+        createdAt: row.created_at,
+      }))
+      const recoveryLogs = parsedRecoveryLogs.filter((r) => !deletedRecoveryLogIds.includes(r.id))
+      useRecoveryStore.setState({ recoveryLogs })
+    }
+
+    // Progress Photos
+    if (photosRes.data?.length) {
+      const parsedPhotos: ProgressPhoto[] = photosRes.data.map((row) => ({
+        id: row.id,
+        date: row.date,
+        photoType: row.photo_type as 'front' | 'left' | 'right' | 'back',
+        photoData: row.photo_data,
+        notes: row.notes,
+        createdAt: row.created_at,
+      }))
+      const photos = parsedPhotos.filter((p) => !deletedPhotoIds.includes(p.id))
+      usePhotosStore.setState({ photos })
     }
 
     // Workout sessions
@@ -676,4 +895,12 @@ export async function isSupabaseReachable(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+// Auto-sync when connection restores
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('[FitOS Sync] Internet connection detected. Triggering auto-sync...');
+    pullAll();
+  });
 }

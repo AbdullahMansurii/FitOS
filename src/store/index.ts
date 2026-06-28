@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { 
   Goal, WeightLog, FoodLog, FoodItem, SavedMeal, 
   WorkoutSession, WorkoutTemplate, Exercise, Memory, 
-  ChatMessage, Profile, AppSettings, Measurement
+  ChatMessage, Profile, AppSettings, Measurement, RecoveryLog, ProgressPhoto
 } from '@/types'
 import { generateId, todayISO } from '@/lib/utils'
 import { SEEDED_EXERCISES, SEEDED_TEMPLATES } from '@/constants/seeds'
@@ -133,6 +133,7 @@ interface FoodState {
   foodLogs: FoodLog[]
   savedMeals: SavedMeal[]
   deletedFoodLogIds: string[]
+  deletedSavedMealIds: string[]
   addFoodItem: (item: Omit<FoodItem, 'id'>) => FoodItem
   updateFoodItem: (id: string, updates: Partial<FoodItem>) => void
   deleteFoodItem: (id: string) => void
@@ -140,8 +141,14 @@ interface FoodState {
   updateFoodLog: (id: string, updates: Partial<FoodLog>) => void
   deleteFoodLog: (id: string) => void
   getLogsByDate: (date: string) => FoodLog[]
-  addSavedMeal: (meal: Omit<SavedMeal, 'id' | 'createdAt'>) => void
+  addSavedMeal: (meal: Omit<SavedMeal, 'id' | 'createdAt'>) => SavedMeal
+  updateSavedMeal: (id: string, updates: Partial<SavedMeal>) => void
   deleteSavedMeal: (id: string) => void
+  renameSavedMeal: (id: string, newName: string) => void
+  duplicateSavedMeal: (id: string) => void
+  updateSavedMealCategory: (id: string, category: string) => void
+  incrementSavedMealUsage: (id: string) => void
+  togglePinSavedMeal: (id: string) => void
   searchFoodItems: (query: string) => FoodItem[]
 }
 
@@ -152,6 +159,7 @@ export const useFoodStore = create<FoodState>()(
       foodLogs: [],
       savedMeals: [],
       deletedFoodLogIds: [],
+      deletedSavedMealIds: [],
       addFoodItem: (data) => {
         const item: FoodItem = { ...data, id: generateId() }
         set((s) => ({ foodItems: [...s.foodItems, item] }))
@@ -171,12 +179,81 @@ export const useFoodStore = create<FoodState>()(
       deleteFoodLog: (id) => { set((s) => ({ foodLogs: s.foodLogs.filter((l) => l.id !== id), deletedFoodLogIds: [...s.deletedFoodLogIds, id] })); triggerSync() },
       getLogsByDate: (date) => get().foodLogs.filter((l) => l.date === date),
       addSavedMeal: (data) => {
-        const meal: SavedMeal = { ...data, id: generateId(), createdAt: new Date().toISOString() }
+        const meal: SavedMeal = {
+          ...data,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          category: data.category || 'custom',
+          usageCount: 0,
+          version: 1,
+          isCurrent: true,
+          updatedAt: new Date().toISOString()
+        }
         set((s) => ({ savedMeals: [...s.savedMeals, meal] }))
+        triggerSync()
+        return meal
+      },
+      updateSavedMeal: (id, updates) => {
+        set((s) => ({
+          savedMeals: s.savedMeals.map((m) => m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m)
+        }))
         triggerSync()
       },
       deleteSavedMeal: (id) => {
-        set((s) => ({ savedMeals: s.savedMeals.filter((m) => m.id !== id) }))
+        set((s) => ({
+          savedMeals: s.savedMeals.filter((m) => m.id !== id),
+          deletedSavedMealIds: [...s.deletedSavedMealIds, id]
+        }))
+        triggerSync()
+      },
+      renameSavedMeal: (id, newName) => {
+        set((s) => ({
+          savedMeals: s.savedMeals.map((m) => m.id === id ? { ...m, name: newName, updatedAt: new Date().toISOString() } : m)
+        }))
+        triggerSync()
+      },
+      duplicateSavedMeal: (id) => {
+        const meal = get().savedMeals.find((m) => m.id === id)
+        if (!meal) return
+        const duplicate: SavedMeal = {
+          ...meal,
+          id: generateId(),
+          name: `Copy of ${meal.name}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          usageCount: 0,
+          lastUsedAt: undefined,
+          version: 1,
+          parentMealId: meal.id,
+          isCurrent: true
+        }
+        set((s) => ({ savedMeals: [...s.savedMeals, duplicate] }))
+        triggerSync()
+      },
+      updateSavedMealCategory: (id, category) => {
+        set((s) => ({
+          savedMeals: s.savedMeals.map((m) => m.id === id ? { ...m, category, updatedAt: new Date().toISOString() } : m)
+        }))
+        triggerSync()
+      },
+      incrementSavedMealUsage: (id) => {
+        set((s) => ({
+          savedMeals: s.savedMeals.map((m) => m.id === id ? {
+            ...m,
+            usageCount: (m.usageCount || 0) + 1,
+            lastUsedAt: new Date().toISOString()
+          } : m)
+        }))
+        triggerSync()
+      },
+      togglePinSavedMeal: (id) => {
+        set((s) => ({
+          savedMeals: s.savedMeals.map((m) => m.id === id ? {
+            ...m,
+            isPinned: !m.isPinned,
+            updatedAt: new Date().toISOString()
+          } : m)
+        }))
         triggerSync()
       },
       searchFoodItems: (query) => {
@@ -553,3 +630,93 @@ export const useUIStore = create<UIState>()((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setActiveDate: (date) => set({ activeDate: date }),
 }))
+
+// ─── Recovery Store ──────────────────────────────────────────────────────────
+
+interface RecoveryState {
+  recoveryLogs: RecoveryLog[]
+  deletedRecoveryLogIds: string[]
+  addRecoveryLog: (log: Omit<RecoveryLog, 'id' | 'createdAt'>) => void
+  updateRecoveryLog: (id: string, updates: Partial<RecoveryLog>) => void
+  deleteRecoveryLog: (id: string) => void
+  getByDate: (date: string) => RecoveryLog | undefined
+  getRange: (from: string, to: string) => RecoveryLog[]
+}
+
+export const useRecoveryStore = create<RecoveryState>()(
+  persist(
+    (set, get) => ({
+      recoveryLogs: [],
+      deletedRecoveryLogIds: [],
+      addRecoveryLog: (data) => {
+        const log: RecoveryLog = {
+          ...data,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+        }
+        set((s) => {
+          const filtered = s.recoveryLogs.filter((l) => l.date !== data.date)
+          return { recoveryLogs: [...filtered, log].sort((a, b) => a.date.localeCompare(b.date)) }
+        })
+        triggerSync()
+      },
+      updateRecoveryLog: (id, updates) => {
+        set((s) => ({
+          recoveryLogs: s.recoveryLogs.map((l) => l.id === id ? { ...l, ...updates } : l)
+        }))
+        triggerSync()
+      },
+      deleteRecoveryLog: (id) => {
+        set((s) => ({
+          recoveryLogs: s.recoveryLogs.filter((l) => l.id !== id),
+          deletedRecoveryLogIds: [...s.deletedRecoveryLogIds, id],
+        }))
+        triggerSync()
+      },
+      getByDate: (date) => get().recoveryLogs.find((l) => l.date === date),
+      getRange: (from, to) => get().recoveryLogs.filter((l) => l.date >= from && l.date <= to),
+    }),
+    { name: 'fitos-recovery' }
+  )
+)
+
+// ─── Progress Photos Store ───────────────────────────────────────────────────
+
+interface PhotosState {
+  photos: ProgressPhoto[]
+  deletedPhotoIds: string[]
+  addPhoto: (photo: Omit<ProgressPhoto, 'id' | 'createdAt'>) => void
+  deletePhoto: (id: string) => void
+  getPhotosByDate: (date: string) => ProgressPhoto[]
+}
+
+export const usePhotosStore = create<PhotosState>()(
+  persist(
+    (set, get) => ({
+      photos: [],
+      deletedPhotoIds: [],
+      addPhoto: (data) => {
+        const photo: ProgressPhoto = {
+          ...data,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+        }
+        set((s) => {
+          // Keep only one photo per type per date
+          const filtered = s.photos.filter((p) => !(p.date === data.date && p.photoType === data.photoType))
+          return { photos: [...filtered, photo].sort((a, b) => b.date.localeCompare(a.date)) }
+        })
+        triggerSync()
+      },
+      deletePhoto: (id) => {
+        set((s) => ({
+          photos: s.photos.filter((p) => p.id !== id),
+          deletedPhotoIds: [...s.deletedPhotoIds, id],
+        }))
+        triggerSync()
+      },
+      getPhotosByDate: (date) => get().photos.filter((p) => p.date === date),
+    }),
+    { name: 'fitos-photos' }
+  )
+)

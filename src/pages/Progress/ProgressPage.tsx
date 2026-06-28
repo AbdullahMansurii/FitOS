@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
-import { Scale, TrendingDown, TrendingUp, Plus, Trash2, BarChart2, Ruler, Calendar, Award } from 'lucide-react'
+import { Scale, TrendingDown, TrendingUp, Plus, Trash2, BarChart2, Ruler, Calendar, Award, Heart, Moon, Footprints, Activity, Camera, X } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useGoalsStore, useWeightStore, useWorkoutStore, useProfileStore, useFoodStore } from '@/store/index'
+import { useGoalsStore, useWeightStore, useWorkoutStore, useProfileStore, useFoodStore, useRecoveryStore, usePhotosStore } from '@/store/index'
 import { todayISO, formatDate, daysAgo, calcGoalProgress } from '@/lib/utils'
 import { WeightLogModal } from '@/components/shared/WeightLogModal'
 import { GoalSetupModal } from '@/components/shared/GoalSetupModal'
@@ -61,11 +61,20 @@ export function ProgressPage() {
   const getRange = useWeightStore((s) => s.getRange)
   const measurements = useWeightStore((s) => s.measurements)
   const sessions = useWorkoutStore((s) => s.sessions)
+  const recoveryLogs = useRecoveryStore((s) => s.recoveryLogs)
+  const deleteRecoveryLog = useRecoveryStore((s) => s.deleteRecoveryLog)
   
-  const [activeTab, setActiveTab] = useState<'weight' | 'physique' | 'nutrition'>('weight')
+  const [activeTab, setActiveTab] = useState<'weight' | 'physique' | 'photos' | 'nutrition' | 'recovery'>('weight')
   const [range, setRange] = useState<Range>('30d')
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [showGoalModal, setShowGoalModal] = useState(false)
+
+  // Photos state and selectors
+  const { photos, addPhoto, deletePhoto } = usePhotosStore()
+  const [photoDate, setPhotoDate] = useState(todayISO())
+  const [photoType, setPhotoType] = useState<'front' | 'left' | 'right' | 'back'>('front')
+  const [photoNotes, setPhotoNotes] = useState('')
+  const [selectedExpandPhoto, setSelectedExpandPhoto] = useState<string | null>(null)
 
   const today = todayISO()
   const activeGoal = getActiveGoal()
@@ -77,6 +86,36 @@ export function ProgressPage() {
   const displayWeight = useCallback((kg: number) => isImperial ? Math.round(kg * 2.20462 * 10) / 10 : kg, [isImperial])
   const displayLength = useCallback((cm: number) => isImperial ? Math.round(cm / 2.54 * 10) / 10 : cm, [isImperial])
 
+  const groupedPhotos = useMemo(() => {
+    const groups: Record<string, Record<string, typeof photos[0]>> = {}
+    photos.forEach((p) => {
+      if (!groups[p.date]) {
+        groups[p.date] = {}
+      }
+      groups[p.date][p.photoType] = p
+    })
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [photos])
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        addPhoto({
+          date: photoDate,
+          photoType,
+          photoData: reader.result,
+          notes: photoNotes.trim() || undefined,
+        })
+        setPhotoNotes('')
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
   // Nutrition Intelligence Data
   const nutritionAnalytics = useMemo(() => {
     const calTarget = activeGoal?.calorieTarget || 2000
@@ -87,6 +126,54 @@ export function ProgressPage() {
   const nutritionRecommendation = useMemo(() => {
     return getNutritionRecommendation(logs, measurements, foodLogs, sessions, activeGoal, profile)
   }, [logs, measurements, foodLogs, sessions, activeGoal, profile])
+
+  // Recovery Trends derived data
+  const recoveryAnalytics = useMemo(() => {
+    // Sort recovery logs ascending by date
+    const sorted = [...recoveryLogs].sort((a, b) => a.date.localeCompare(b.date))
+    
+    // Last 7 logs for averages
+    const last7 = sorted.slice(-7)
+    
+    const sleepSum = last7.reduce((sum, r) => sum + (r.sleepHours || 0), 0)
+    const sleepCount = last7.filter(r => r.sleepHours !== null).length
+    const avgSleep = sleepCount > 0 ? (sleepSum / sleepCount).toFixed(1) : '—'
+    
+    const stepsSum = last7.reduce((sum, r) => sum + (r.dailySteps || 0), 0)
+    const stepsCount = last7.filter(r => r.dailySteps !== null).length
+    const avgSteps = stepsCount > 0 ? Math.round(stepsSum / stepsCount) : '—'
+    
+    const moodSum = last7.reduce((sum, r) => sum + (r.mood || 0), 0)
+    const moodCount = last7.filter(r => r.mood !== null).length
+    const avgMood = moodCount > 0 ? (moodSum / moodCount).toFixed(1) : '—'
+    
+    const energySum = last7.reduce((sum, r) => sum + (r.energy || 0), 0)
+    const energyCount = last7.filter(r => r.energy !== null).length
+    const avgEnergy = energyCount > 0 ? (energySum / energyCount).toFixed(1) : '—'
+
+    // Map data for charts over selected range
+    const rangeDays = { '7d': 7, '30d': 30, '90d': 90 }[range]
+    const filteredRange = sorted.filter(r => r.date >= daysAgo(rangeDays))
+    
+    const chartData = filteredRange.map((r) => ({
+      date: formatDate(r.date, 'short'),
+      sleep: r.sleepHours || 0,
+      steps: r.dailySteps || 0,
+      mood: r.mood || 0,
+      energy: r.energy || 0,
+      soreness: r.muscleSoreness || 0,
+      fullDate: r.date
+    }))
+
+    return {
+      avgSleep,
+      avgSteps,
+      avgMood,
+      avgEnergy,
+      chartData,
+      history: [...sorted].reverse()
+    }
+  }, [recoveryLogs, range])
 
   // 1. Weight Trends Data
   const latestWeight = logs.length > 0 ? [...logs].sort((a, b) => b.date.localeCompare(a.date))[0] : null
@@ -152,6 +239,101 @@ export function ProgressPage() {
       fullDate: w.date
     }))
   }, [waistHistory, displayLength])
+
+  const chestHistory = useMemo(() => {
+    return measurements
+      .filter(m => m.chestCm !== undefined && m.chestCm > 0)
+      .map(m => ({ date: m.date, value: m.chestCm! }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [measurements])
+
+  const armHistory = useMemo(() => {
+    return measurements
+      .filter(m => (m.leftArmCm !== undefined && m.leftArmCm > 0) || (m.rightArmCm !== undefined && m.rightArmCm > 0) || (m.armsCm !== undefined && m.armsCm > 0))
+      .map(m => {
+        let value = m.armsCm || 0
+        if (m.leftArmCm && m.rightArmCm) {
+          value = (m.leftArmCm + m.rightArmCm) / 2
+        } else if (m.leftArmCm) {
+          value = m.leftArmCm
+        } else if (m.rightArmCm) {
+          value = m.rightArmCm
+        }
+        return { date: m.date, value }
+      })
+      .filter(v => v.value > 0)
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [measurements])
+
+  const physiqueChestChartData = useMemo(() => {
+    return chestHistory.map(c => ({
+      date: formatDate(c.date, 'short'),
+      chest: displayLength(c.value),
+      fullDate: c.date
+    }))
+  }, [chestHistory, displayLength])
+
+  const physiqueArmChartData = useMemo(() => {
+    return armHistory.map(a => ({
+      date: formatDate(a.date, 'short'),
+      arm: displayLength(a.value),
+      fullDate: a.date
+    }))
+  }, [armHistory, displayLength])
+
+  const weeklyPhysiqueChanges = useMemo(() => {
+    const getMetricAtDaysAgo = (days: number, history: { date: string; value: number }[]) => {
+      if (history.length === 0) return null
+      const targetDateStr = daysAgo(days)
+      let closest = history[0]
+      let minDiff = Math.abs(new Date(closest.date).getTime() - new Date(targetDateStr).getTime())
+      for (const h of history) {
+        const diff = Math.abs(new Date(h.date).getTime() - new Date(targetDateStr).getTime())
+        if (diff < minDiff) {
+          closest = h
+          minDiff = diff
+        }
+      }
+      if (minDiff > 4 * 24 * 60 * 60 * 1000) return null
+      return closest.value
+    }
+
+    const metrics = [
+      { name: 'Weight', history: weightMap, unit: weightLabel, displayFn: displayWeight },
+      { name: 'Waist', history: waistHistory, unit: lengthLabel, displayFn: displayLength },
+      { name: 'Chest', history: chestHistory, unit: lengthLabel, displayFn: displayLength },
+      { name: 'Arms (avg)', history: armHistory, unit: lengthLabel, displayFn: displayLength }
+    ]
+
+    const weeks = [
+      { label: 'This Week (1-7d)', start: 7, end: 0 },
+      { label: 'Last Week (8-14d)', start: 14, end: 7 },
+      { label: '2 Weeks Ago (15-21d)', start: 21, end: 14 },
+      { label: '3 Weeks Ago (22-28d)', start: 28, end: 21 }
+    ]
+
+    return weeks.map(w => {
+      const rowMetrics = metrics.map(m => {
+        const startVal = getMetricAtDaysAgo(w.start, m.history)
+        const endVal = getMetricAtDaysAgo(w.end, m.history)
+        let change: number | null = null
+        if (startVal !== null && endVal !== null) {
+          change = endVal - startVal
+        }
+        return {
+          name: m.name,
+          start: startVal ? m.displayFn(startVal) : null,
+          end: endVal ? m.displayFn(endVal) : null,
+          change: change !== null ? m.displayFn(change) : null,
+          unit: m.unit
+        }
+      })
+      return {
+        label: w.label,
+        metrics: rowMetrics
+      }
+    })
+  }, [weightMap, waistHistory, chestHistory, armHistory, displayWeight, displayLength, weightLabel, lengthLabel])
 
   // Timeline classification history
   const classificationHistory = useMemo(() => {
@@ -280,6 +462,21 @@ export function ProgressPage() {
           Physique Analytics
         </button>
         <button
+          onClick={() => setActiveTab('photos')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: 15,
+            fontWeight: activeTab === 'photos' ? 600 : 400,
+            color: activeTab === 'photos' ? 'var(--accent)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'photos' ? '2.5px solid var(--accent)' : 'none',
+            paddingBottom: 8,
+            cursor: 'pointer'
+          }}
+        >
+          Photo Timeline
+        </button>
+        <button
           onClick={() => setActiveTab('nutrition')}
           style={{
             background: 'none',
@@ -293,6 +490,21 @@ export function ProgressPage() {
           }}
         >
           Nutrition Analytics
+        </button>
+        <button
+          onClick={() => setActiveTab('recovery')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: 15,
+            fontWeight: activeTab === 'recovery' ? 600 : 400,
+            color: activeTab === 'recovery' ? 'var(--accent)' : 'var(--text-muted)',
+            borderBottom: activeTab === 'recovery' ? '2.5px solid var(--accent)' : 'none',
+            paddingBottom: 8,
+            cursor: 'pointer'
+          }}
+        >
+          Recovery Trends
         </button>
       </div>
 
@@ -546,8 +758,8 @@ export function ProgressPage() {
             </div>
           </div>
 
-          {/* Charts Row */}
-          <div className="grid-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          {/* Charts Row - 2x2 Grid */}
+          <div className="grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
             {/* Weight Chart */}
             <div className="card-elevated">
               <div className="section-title" style={{ marginBottom: 14 }}>Weight Trend History</div>
@@ -581,7 +793,7 @@ export function ProgressPage() {
 
             {/* Waist Chart */}
             <div className="card-elevated">
-              <div className="section-title" style={{ marginBottom: 14 }}>Waist circumference History</div>
+              <div className="section-title" style={{ marginBottom: 14 }}>Waist Circumference History</div>
               {physiqueWaistChartData.length > 1 ? (
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={physiqueWaistChartData}>
@@ -608,6 +820,117 @@ export function ProgressPage() {
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>Log multiple waist measurements to load chart</div>
                 </div>
               )}
+            </div>
+
+            {/* Chest Chart */}
+            <div className="card-elevated">
+              <div className="section-title" style={{ marginBottom: 14 }}>Chest circumference History</div>
+              {physiqueChestChartData.length > 1 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={physiqueChestChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis
+                      domain={['auto', 'auto']}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                      tickLine={false} axisLine={false}
+                      tickFormatter={(v) => `${v}${lengthLabel}`}
+                      width={44}
+                    />
+                    <Tooltip content={<CustomTooltip unitLabel={lengthLabel} />} />
+                    <Line
+                      type="monotone" dataKey="chest"
+                      stroke="var(--emerald)" strokeWidth={2}
+                      dot={{ fill: 'var(--emerald)', r: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="empty-state" style={{ padding: '20px 0' }}>
+                  <Ruler size={20} color="var(--text-muted)" />
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>Log multiple chest measurements to load chart</div>
+                </div>
+              )}
+            </div>
+
+            {/* Arm Chart */}
+            <div className="card-elevated">
+              <div className="section-title" style={{ marginBottom: 14 }}>Arm circumference History</div>
+              {physiqueArmChartData.length > 1 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={physiqueArmChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis
+                      domain={['auto', 'auto']}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                      tickLine={false} axisLine={false}
+                      tickFormatter={(v) => `${v}${lengthLabel}`}
+                      width={44}
+                    />
+                    <Tooltip content={<CustomTooltip unitLabel={lengthLabel} />} />
+                    <Line
+                      type="monotone" dataKey="arm"
+                      stroke="var(--purple)" strokeWidth={2}
+                      dot={{ fill: 'var(--purple)', r: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="empty-state" style={{ padding: '20px 0' }}>
+                  <Ruler size={20} color="var(--text-muted)" />
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>Log arm measurements (left/right) to load chart</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Weekly changes comparison */}
+          <div className="card-elevated">
+            <div className="section-title" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={16} color="var(--accent)" />
+              <span>Weekly Physique Delta Comparison</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Metric</th>
+                    {weeklyPhysiqueChanges.map((w, idx) => (
+                      <th key={idx} style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500, textAlign: 'center' }}>
+                        {w.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {['Weight', 'Waist', 'Chest', 'Arms (avg)'].map((mName, mIdx) => (
+                    <tr key={mName} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>{mName}</td>
+                      {weeklyPhysiqueChanges.map((w, wIdx) => {
+                        const m = w.metrics[mIdx]
+                        const isNeg = m.change !== null && m.change < 0
+                        const isPos = m.change !== null && m.change > 0
+                        const color = isNeg ? 'var(--emerald)' : isPos ? 'var(--red)' : 'var(--text-muted)'
+                        return (
+                          <td key={wIdx} style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            {m.start !== null && m.end !== null ? (
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 500 }}>
+                                  {m.start.toFixed(1)} → {m.end.toFixed(1)} {m.unit}
+                                </div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color, marginTop: 2 }}>
+                                  {m.change !== null ? `${m.change > 0 ? '+' : ''}${m.change.toFixed(1)} ${m.unit}` : '—'}
+                                </div>
+                              </div>
+                            ) : '—'}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -911,6 +1234,407 @@ export function ProgressPage() {
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No logged nutrition history found.</div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB 4: Recovery Trends ─── */}
+      {activeTab === 'recovery' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Recovery Stats Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+            {[
+              { label: '7d Avg Sleep', value: `${recoveryAnalytics.avgSleep} hrs`, icon: Moon, color: 'var(--blue)' },
+              { label: '7d Avg Steps', value: recoveryAnalytics.avgSteps !== '—' ? `${recoveryAnalytics.avgSteps.toLocaleString()} steps` : '—', icon: Footprints, color: 'var(--emerald)' },
+              { label: '7d Avg Mood', value: recoveryAnalytics.avgMood !== '—' ? `${recoveryAnalytics.avgMood}/5` : '—', icon: Heart, color: 'var(--accent)' },
+              { label: '7d Avg Energy', value: recoveryAnalytics.avgEnergy !== '—' ? `${recoveryAnalytics.avgEnergy}/5` : '—', icon: Activity, color: 'var(--amber)' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="card-elevated">
+                <Icon size={16} color={color} style={{ marginBottom: 10 }} />
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Recovery Charts Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: 20 }}>
+            {/* Sleep Trend Chart */}
+            <div className="card-elevated">
+              <div className="section-title" style={{ marginBottom: 16 }}>Sleep Duration Trend ({range})</div>
+              <div style={{ height: 220, width: '100%' }}>
+                {recoveryAnalytics.chartData.length >= 1 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={recoveryAnalytics.chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                        tickLine={false} axisLine={false}
+                        tickFormatter={(v) => `${v}h`}
+                        width={40}
+                      />
+                      <Tooltip content={<CustomTooltip unitLabel="hrs" />} />
+                      <Line
+                        type="monotone" dataKey="sleep"
+                        stroke="var(--blue)" strokeWidth={2.5}
+                        dot={{ fill: 'var(--blue)', r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-state-title">No recovery logs</div>
+                    <div className="empty-state-desc">Log your sleep and recovery metrics to see trends here.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Steps Trend Chart */}
+            <div className="card-elevated">
+              <div className="section-title" style={{ marginBottom: 16 }}>Daily Steps Trend ({range})</div>
+              <div style={{ height: 220, width: '100%' }}>
+                {recoveryAnalytics.chartData.length >= 1 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={recoveryAnalytics.chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                        tickLine={false} axisLine={false}
+                        tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                        width={45}
+                      />
+                      <Tooltip content={<CustomTooltip unitLabel="steps" />} />
+                      <Line
+                        type="monotone" dataKey="steps"
+                        stroke="var(--emerald)" strokeWidth={2.5}
+                        dot={{ fill: 'var(--emerald)', r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-state-title">No recovery logs</div>
+                    <div className="empty-state-desc">Log steps to see trends here.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Mood, Energy & Soreness Chart */}
+          <div className="card-elevated">
+            <div className="section-title" style={{ marginBottom: 16 }}>Mood, Energy & Muscle Soreness Correlations ({range})</div>
+            <div style={{ height: 220, width: '100%' }}>
+              {recoveryAnalytics.chartData.length >= 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={recoveryAnalytics.chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis
+                      domain={[1, 5]}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                      tickLine={false} axisLine={false}
+                      width={30}
+                    />
+                    <Tooltip content={<CustomTooltip unitLabel="/5" />} />
+                    <Line
+                      type="monotone" dataKey="mood" name="Mood"
+                      stroke="var(--accent)" strokeWidth={2}
+                      dot={{ fill: 'var(--accent)', r: 2 }}
+                    />
+                    <Line
+                      type="monotone" dataKey="energy" name="Energy"
+                      stroke="var(--amber)" strokeWidth={2}
+                      dot={{ fill: 'var(--amber)', r: 2 }}
+                    />
+                    <Line
+                      type="monotone" dataKey="soreness" name="Soreness"
+                      stroke="var(--red)" strokeWidth={2}
+                      dot={{ fill: 'var(--red)', r: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-title">No recovery logs</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recovery Log Table */}
+          <div className="card-elevated">
+            <div className="section-title" style={{ marginBottom: 16 }}>Recovery Log History</div>
+            {recoveryAnalytics.history.length > 0 ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Date</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Sleep</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Steps</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Mood</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Energy</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Soreness</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Notes</th>
+                      <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 500 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recoveryAnalytics.history.slice(0, 15).map((log) => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 500 }}>{formatDate(log.date, 'medium')}</td>
+                        <td style={{ padding: '10px 12px' }}>{log.sleepHours !== null ? `${log.sleepHours} hrs` : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>{log.dailySteps !== null ? log.dailySteps.toLocaleString() : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>{log.mood !== null ? `${log.mood}/5` : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>{log.energy !== null ? `${log.energy}/5` : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>{log.muscleSoreness !== null ? `${log.muscleSoreness}/5` : '—'}</td>
+                        <td style={{ padding: '10px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.notes || ''}>
+                          {log.notes || '—'}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <button className="btn btn-ghost btn-icon-sm" onClick={() => deleteRecoveryLog(log.id)}>
+                            <Trash2 size={13} color="var(--text-muted)" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state" style={{ padding: '24px 0' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No recovery logs logged yet.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB 5: Photo Timeline ─── */}
+      {activeTab === 'photos' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Upload Photo Form */}
+          <div className="card-elevated">
+            <div className="section-title" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Camera size={16} color="var(--accent)" />
+              <span>Log Progress Photo</span>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+              <div className="input-group" style={{ minWidth: 150, flex: 1 }}>
+                <label className="input-label">Date</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={photoDate}
+                  onChange={(e) => setPhotoDate(e.target.value)}
+                />
+              </div>
+
+              <div className="input-group" style={{ minWidth: 150, flex: 1 }}>
+                <label className="input-label">Angle</label>
+                <select
+                  className="input"
+                  value={photoType}
+                  onChange={(e) => setPhotoType(e.target.value as 'front' | 'left' | 'right' | 'back')}
+                >
+                  <option value="front">Front View</option>
+                  <option value="left">Left Side</option>
+                  <option value="right">Right Side</option>
+                  <option value="back">Back View</option>
+                </select>
+              </div>
+
+              <div className="input-group" style={{ minWidth: 220, flex: 2 }}>
+                <label className="input-label">Notes (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., waking, empty stomach, flexed"
+                  className="input"
+                  value={photoNotes}
+                  onChange={(e) => setPhotoNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+                <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 40 }}>
+                  <Plus size={16} /> Choose Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Photos Timeline View */}
+          <div className="card-elevated">
+            <div className="section-title" style={{ marginBottom: 20 }}>Visual Timeline</div>
+
+            {groupedPhotos.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {groupedPhotos.map(([dateStr, angles]) => (
+                  <div key={dateStr} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                        {formatDate(dateStr, 'medium')}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+                      {(['front', 'left', 'right', 'back'] as const).map((angle) => {
+                        const item = angles[angle]
+                        return (
+                          <div 
+                            key={angle} 
+                            style={{ 
+                              background: 'var(--bg-base)', 
+                              borderRadius: 12, 
+                              border: '1px solid var(--border-subtle)', 
+                              padding: 8, 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: 8, 
+                              position: 'relative' 
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                                {angle}
+                              </span>
+                              {item && (
+                                <button 
+                                  onClick={() => {
+                                    if (confirm('Delete this progress photo?')) {
+                                      deletePhoto(item.id)
+                                    }
+                                  }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                                  title="Delete photo"
+                                >
+                                  <Trash2 size={12} color="var(--red)" style={{ opacity: 0.7 }} />
+                                </button>
+                              )}
+                            </div>
+
+                            {item ? (
+                              <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 8, overflow: 'hidden', background: '#000', cursor: 'zoom-in' }} onClick={() => setSelectedExpandPhoto(item.photoData)}>
+                                <img 
+                                  src={item.photoData} 
+                                  alt={`${angle} view on ${dateStr}`} 
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                />
+                                {item.notes && (
+                                  <div 
+                                    style={{ 
+                                      position: 'absolute', 
+                                      bottom: 0, 
+                                      left: 0, 
+                                      right: 0, 
+                                      background: 'rgba(0,0,0,0.6)', 
+                                      padding: '4px 8px', 
+                                      fontSize: 10, 
+                                      color: '#fff', 
+                                      whiteSpace: 'nowrap', 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis' 
+                                    }}
+                                    title={item.notes}
+                                  >
+                                    {item.notes}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div 
+                                style={{ 
+                                  width: '100%', 
+                                  aspectRatio: '3/4', 
+                                  borderRadius: 8, 
+                                  background: 'var(--bg-muted)', 
+                                  border: '1px dashed var(--border-default)', 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  gap: 6,
+                                  color: 'var(--text-muted)'
+                                }}
+                              >
+                                <Camera size={18} />
+                                <span style={{ fontSize: 10 }}>Not Logged</span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state" style={{ padding: '40px 0' }}>
+                <Camera size={32} color="var(--text-muted)" style={{ marginBottom: 12 }} />
+                <div className="empty-state-title">No photos logged yet</div>
+                <div className="empty-state-desc">Upload your front, side, and back photos to track visual body composition changes.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Photo Lightbox */}
+      {selectedExpandPhoto && (
+        <div 
+          style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            zIndex: 999, 
+            background: 'rgba(0,0,0,0.9)', 
+            backdropFilter: 'blur(8px)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            padding: 16 
+          }}
+          onClick={() => setSelectedExpandPhoto(null)}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={selectedExpandPhoto} 
+              alt="Expanded Progress" 
+              style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} 
+            />
+            <button 
+              onClick={() => setSelectedExpandPhoto(null)}
+              style={{ 
+                position: 'absolute', 
+                top: -12, 
+                right: -12, 
+                background: 'var(--accent)', 
+                color: '#0a0b0f', 
+                border: 'none', 
+                borderRadius: '50%', 
+                width: 28, 
+                height: 28, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-md)'
+              }}
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
       )}

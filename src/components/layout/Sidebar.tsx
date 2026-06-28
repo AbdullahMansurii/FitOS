@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { 
   LayoutDashboard, Utensils, Dumbbell, TrendingUp, 
-  MessageSquare, Settings, Lock, Zap, Ruler
+  MessageSquare, Settings, Lock, Zap, Ruler, UtensilsCrossed, MoreHorizontal
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/index'
@@ -11,6 +12,7 @@ import { SyncIndicator } from '@/components/shared/SyncIndicator'
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/food', icon: Utensils, label: 'Food' },
+  { to: '/meals', icon: UtensilsCrossed, label: 'Meals' },
   { to: '/workout', icon: Dumbbell, label: 'Workout' },
   { to: '/progress', icon: TrendingUp, label: 'Progress' },
   { to: '/measurements', icon: Ruler, label: 'Measurements' },
@@ -89,18 +91,89 @@ export function Sidebar() {
 
 // Bottom nav for mobile
 export function BottomNav() {
-  const mobileNavItems = navItems.slice(0, 5) // skip settings on bottom
+  const [showMore, setShowMore] = useState(false)
+
+  const primaryItems = [
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/food', icon: Utensils, label: 'Food' },
+    { to: '/workout', icon: Dumbbell, label: 'Workout' },
+    { to: '/progress', icon: TrendingUp, label: 'Progress' },
+    { to: '/coach', icon: MessageSquare, label: 'Coach' },
+  ]
+
+  const overflowItems = [
+    { to: '/meals', icon: UtensilsCrossed, label: 'Meals' },
+    { to: '/measurements', icon: Ruler, label: 'Measurements' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
+  ]
 
   return (
-    <nav className="bottom-nav">
-      {mobileNavItems.map(({ to, icon: Icon, label }) => (
-        <NavLink key={to} to={to} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 12px', borderRadius: 10, textDecoration: 'none', transition: 'all 0.15s ease' }}
-          className={({ isActive }) => cn(isActive ? 'text-accent' : 'text-muted')}
+    <>
+      {/* Overflow Menu Sheet */}
+      {showMore && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/60 z-30 md:hidden"
+            onClick={() => setShowMore(false)}
+          />
+          <div 
+            className="fixed bottom-[var(--bottom-nav-height)] left-4 right-4 p-4 rounded-t-2xl z-40 md:hidden animate-fade-in"
+            style={{
+              background: 'rgba(18, 20, 26, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid var(--border-default)',
+              borderBottom: 'none',
+              boxShadow: '0 -10px 30px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>More Options</span>
+              <button 
+                onClick={() => setShowMore(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {overflowItems.map(({ to, icon: Icon, label }) => (
+                <NavLink 
+                  key={to} 
+                  to={to} 
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 8px', borderRadius: 12, textDecoration: 'none', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-subtle)' }}
+                  className={({ isActive }) => cn(isActive ? 'text-accent' : 'text-secondary')}
+                  onClick={() => setShowMore(false)}
+                >
+                  <Icon size={18} />
+                  <span style={{ fontSize: 11, fontWeight: 500 }}>{label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Main Bottom Nav Bar */}
+      <nav className="bottom-nav">
+        {primaryItems.map(({ to, icon: Icon, label }) => (
+          <NavLink key={to} to={to} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px', borderRadius: 10, textDecoration: 'none', transition: 'all 0.15s ease', flex: 1 }}
+            className={({ isActive }) => cn(isActive ? 'text-accent' : 'text-muted')}
+          >
+            <Icon size={18} />
+            <span style={{ fontSize: 9, fontWeight: 500 }}>{label}</span>
+          </NavLink>
+        ))}
+        
+        {/* More button */}
+        <button
+          onClick={() => setShowMore(!showMore)}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 4px', borderRadius: 10, background: 'none', border: 'none', cursor: 'pointer', transition: 'all 0.15s ease', flex: 1 }}
+          className={cn(showMore ? 'text-accent' : 'text-muted')}
         >
-          <Icon size={20} />
-          <span style={{ fontSize: 10, fontWeight: 500 }}>{label}</span>
-        </NavLink>
-      ))}
-    </nav>
+          <MoreHorizontal size={18} />
+          <span style={{ fontSize: 9, fontWeight: 500 }}>More</span>
+        </button>
+      </nav>
+    </>
   )
 }

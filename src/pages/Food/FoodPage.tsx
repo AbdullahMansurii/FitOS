@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Plus, Search, Loader, Trash2, MessageSquare, X, Check, ChevronDown } from 'lucide-react'
+/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect */
+import { useState, useEffect, useMemo } from 'react'
+import { Plus, Search, Loader, Trash2, MessageSquare, X, Check, ChevronDown, Sparkles, AlertTriangle, Copy } from 'lucide-react'
 import { useFoodStore, useGoalsStore, useSettingsStore } from '@/store/index'
 import { createAIProvider } from '@/lib/ai'
 import { searchOpenFoodFacts } from '@/lib/foodApi'
@@ -7,8 +8,25 @@ import type { ExternalFoodResult } from '@/lib/foodApi'
 import { todayISO } from '@/lib/utils'
 import type { MealType, FoodLog, ProposedFoodLog, CuratedFood } from '@/types'
 import { MacroRing } from '@/components/shared/MacroRing'
-import { CURATED_FOODS } from '@/constants/foodDatabase'
+import { resolveFood, resolveFoodById, getAllFoods } from '@/lib/nutritionResolver'
 import { mapExtractedToProposed, recalculateProposed } from '@/lib/foodMapper'
+
+import type { ServingSize } from '@/types'
+import { calculateDailyNutritionReport } from '@/lib/nutritionIntelligence'
+
+interface FoodSearchItem {
+  id: string
+  name: string
+  brand?: string
+  caloriesPer100g: number
+  proteinPer100g: number
+  carbsPer100g: number
+  fatPer100g: number
+  fiberPer100g?: number
+  servingSizes?: ServingSize[]
+  source: 'personal_chart' | 'curated' | 'open_food_facts'
+  diaas: number | null
+}
 
 type LogMode = 'diary' | 'chat' | 'search' | 'manual'
 
@@ -24,7 +42,8 @@ export function FoodPage() {
   const [selectedMeal, setSelectedMeal] = useState<MealType>('breakfast')
   const [chatInput, setChatInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<ExternalFoodResult[]>([])
+
+  const [searchResults, setSearchResults] = useState<FoodSearchItem[]>([])
   const [searching, setSearching] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsedEntries, setParsedEntries] = useState<ProposedFoodLog[]>([])
@@ -60,20 +79,60 @@ export function FoodPage() {
     return acc
   }, {} as Record<MealType, FoodLog[]>)
 
+  const dailyReport = useMemo(() => {
+    return calculateDailyNutritionReport(date, todayLogs, calorieTarget, proteinTarget)
+  }, [date, todayLogs, calorieTarget, proteinTarget])
+
   // ─── Search ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      if (searchQuery.length < 2) { setSearchResults([]); return }
+      const q = searchQuery.toLowerCase().trim()
+      if (q.length < 2) { setSearchResults([]); return }
       setSearching(true)
-      const results = await searchOpenFoodFacts(searchQuery)
-      setSearchResults(results)
+      
+      // 1. Search local database (personal chart + curated)
+      const localResults: FoodSearchItem[] = getAllFoods()
+        .filter((rf) => {
+          return rf.food.name.toLowerCase().includes(q) ||
+                 rf.food.aliases.some((alias) => alias.toLowerCase().includes(q))
+        })
+        .map((rf) => ({
+          id: rf.food.id,
+          name: rf.food.name,
+          caloriesPer100g: rf.food.caloriesPer100g,
+          proteinPer100g: rf.food.proteinPer100g,
+          carbsPer100g: rf.food.carbsPer100g,
+          fatPer100g: rf.food.fatPer100g,
+          servingSizes: rf.food.servingSizes,
+          source: rf.source as 'personal_chart' | 'curated',
+          diaas: rf.diaas,
+        }))
+
+      // 2. Search Open Food Facts API
+      const apiResults = await searchOpenFoodFacts(q)
+      const offResults: FoodSearchItem[] = apiResults
+        .filter((res) => !localResults.some((l) => l.name.toLowerCase() === res.name.toLowerCase()))
+        .map((res) => ({
+          id: res.id,
+          name: res.name,
+          brand: res.brand,
+          caloriesPer100g: res.caloriesPer100g,
+          proteinPer100g: res.proteinPer100g,
+          carbsPer100g: res.carbsPer100g,
+          fatPer100g: res.fatPer100g,
+          fiberPer100g: res.fiberPer100g,
+          source: 'open_food_facts' as const,
+          diaas: null,
+        }))
+
+      setSearchResults([...localResults, ...offResults])
       setSearching(false)
     }, 500)
     return () => clearTimeout(t)
   }, [searchQuery])
 
-  const addFromSearch = (item: ExternalFoodResult, qty = 100) => {
+  const addFromSearch = (item: FoodSearchItem, qty = 100) => {
     const ratio = qty / 100
     addFoodLog({
       date,
@@ -84,6 +143,10 @@ export function FoodPage() {
       protein: Math.round(item.proteinPer100g * ratio * 10) / 10,
       carbs: Math.round(item.carbsPer100g * ratio * 10) / 10,
       fat: Math.round(item.fatPer100g * ratio * 10) / 10,
+      proteinQualityScore: item.diaas,
+      proteinQualityMethod: item.diaas ? 'diaas' : 'none',
+      nutritionSource: item.source,
+      foodItemId: item.source !== 'open_food_facts' ? item.id : undefined,
     })
     setSearchQuery('')
     setSearchResults([])
@@ -143,6 +206,9 @@ export function FoodPage() {
         protein: entry.calculatedProtein,
         carbs: entry.calculatedCarbs,
         fat: entry.calculatedFat,
+        proteinQualityScore: entry.diaas || null,
+        proteinQualityMethod: entry.diaas ? 'diaas' : 'none',
+        nutritionSource: entry.source,
       })
     })
     setChatInput('')
@@ -155,41 +221,171 @@ export function FoodPage() {
 
   const addManual = () => {
     if (!manualName || !manualCalories) return
+    const resolved = resolveFood(manualName)
+    const qty = Number(manualQty) || 100
+    
     addFoodLog({
       date,
       mealType: selectedMeal,
-      name: manualName,
-      quantityG: Number(manualQty) || 100,
+      name: resolved ? resolved.food.name : manualName,
+      quantityG: qty,
       calories: Number(manualCalories) || 0,
       protein: Number(manualProtein) || 0,
       carbs: Number(manualCarbs) || 0,
       fat: Number(manualFat) || 0,
+      proteinQualityScore: resolved ? resolved.diaas : null,
+      proteinQualityMethod: resolved && resolved.diaas ? 'diaas' : 'none',
+      nutritionSource: resolved ? resolved.source : 'manual',
     })
     setManualName(''); setManualCalories(''); setManualProtein(''); setManualCarbs(''); setManualFat(''); setManualQty('100')
     setMode('diary')
   }
 
+  const handleDuplicateYesterday = () => {
+    const activeTime = new Date(date + 'T12:00:00').getTime()
+    const yesterdayDate = new Date(activeTime - 24 * 60 * 60 * 1000)
+    const yesterdayISOStr = yesterdayDate.toISOString().split('T')[0]
+    
+    const yesterdayLogs = foodLogs.filter((l) => l.date === yesterdayISOStr)
+    
+    if (yesterdayLogs.length === 0) {
+      alert('No food logs found for yesterday!')
+      return
+    }
+
+    if (confirm(`Duplicate all ${yesterdayLogs.length} items logged yesterday (${yesterdayISOStr}) to today (${date})?`)) {
+      yesterdayLogs.forEach((l) => {
+        addFoodLog({
+          date: date,
+          mealType: l.mealType,
+          name: l.name,
+          foodItemId: l.foodItemId,
+          savedMealId: l.savedMealId,
+          quantityG: l.quantityG,
+          calories: l.calories,
+          protein: l.protein,
+          carbs: l.carbs,
+          fat: l.fat,
+          proteinQualityScore: l.proteinQualityScore || null,
+          proteinQualityMethod: l.proteinQualityMethod || 'none',
+          nutritionSource: l.nutritionSource || 'custom',
+          savedMealVersion: l.savedMealVersion || undefined,
+        })
+      })
+      alert(`Successfully duplicated ${yesterdayLogs.length} logs!`)
+    }
+  }
+
   return (
     <div className="page-container animate-fade-in" style={{ maxWidth: 900 }}>
       {/* Header */}
-      <div className="flex-between" style={{ marginBottom: 24 }}>
+      <div className="flex-between" style={{ marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Food</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>Track your daily nutrition</p>
         </div>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="input"
-          style={{ width: 160, fontSize: 13 }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            onClick={handleDuplicateYesterday}
+            title="Copy all food logged yesterday to today"
+            style={{ height: 38 }}
+          >
+            <Copy size={14} /> Duplicate Yesterday
+          </button>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="input"
+            style={{ width: 145, fontSize: 13, height: 38 }}
+          />
+        </div>
       </div>
 
       {/* Nutrition summary */}
       <div className="card-elevated" style={{ marginBottom: 20 }}>
         <MacroRing calories={nutrition.calories} calorieTarget={calorieTarget} protein={nutrition.protein} proteinTarget={proteinTarget} carbs={nutrition.carbs} fat={nutrition.fat} />
       </div>
+
+      {/* Nutrition Intelligence V2 Dashboard */}
+      {todayLogs.length > 0 && (
+        <div className="card-elevated animate-fade-in" style={{ marginBottom: 20, padding: 20 }}>
+          <div className="flex-between" style={{ marginBottom: 16, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={16} color="var(--accent)" />
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
+                Nutrition Intelligence
+              </span>
+            </div>
+            <span 
+              className="badge" 
+              style={{ 
+                fontSize: 11, 
+                backgroundColor: dailyReport.qualityScore >= 80 ? 'rgba(34, 197, 94, 0.1)' : dailyReport.qualityScore >= 60 ? 'rgba(56, 189, 248, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                color: dailyReport.qualityScore >= 80 ? 'var(--emerald)' : dailyReport.qualityScore >= 60 ? 'var(--accent)' : 'var(--amber)',
+                fontWeight: 700 
+              }}
+            >
+              Score: {dailyReport.qualityScore}/100
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 16 }}>
+            {/* Protein Quality */}
+            <div style={{ background: 'var(--bg-base)', padding: 12, borderRadius: 8, borderLeft: '3px solid var(--macro-protein)' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Protein Quality</span>
+              <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: 'var(--text-primary)' }}>
+                {dailyReport.avgDiaas ? `${Math.round(dailyReport.avgDiaas * 100)}%` : '—'}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--macro-protein)', display: 'block', marginTop: 2 }}>
+                {dailyReport.proteinQualityGrade !== 'N/A' ? `${dailyReport.proteinQualityGrade} Rating` : 'No DIAAS Mapped'}
+              </span>
+            </div>
+
+            {/* Fiber Target */}
+            <div style={{ background: 'var(--bg-base)', padding: 12, borderRadius: 8, borderLeft: '3px solid var(--accent)' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Dietary Fiber</span>
+              <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: 'var(--text-primary)' }}>
+                {dailyReport.fiber}g <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>/ 30g</span>
+              </div>
+              <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 6 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (dailyReport.fiber / 30) * 100)}%`, background: 'var(--accent)', borderRadius: 9999 }} />
+              </div>
+            </div>
+
+            {/* Fruits & Veg */}
+            <div style={{ background: 'var(--bg-base)', padding: 12, borderRadius: 8, borderLeft: '3px solid var(--emerald)' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Fruit & Veg Servings</span>
+              <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: 'var(--text-primary)' }}>
+                {dailyReport.fruitVegServings} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>/ 5.0</span>
+              </div>
+              <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 6 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (dailyReport.fruitVegServings / 5) * 100)}%`, background: 'var(--emerald)', borderRadius: 9999 }} />
+              </div>
+            </div>
+
+            {/* Fats & Healthy Oils */}
+            <div style={{ background: 'var(--bg-base)', padding: 12, borderRadius: 8, borderLeft: '3px solid var(--macro-fat)' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Omega-3 & Sat. Fat</span>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4, color: 'var(--text-primary)' }}>
+                Ω-3: {dailyReport.omega3}g
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: dailyReport.satFatCaloriesPct > 10 ? 'var(--amber)' : 'var(--text-muted)', display: 'block', marginTop: 2 }}>
+                Sat. Fat: {dailyReport.satFatCaloriesPct}% kcal {dailyReport.satFatCaloriesPct > 10 ? '⚠️' : '✓'}
+              </span>
+            </div>
+          </div>
+
+          {/* Added Sugar Warnings */}
+          {dailyReport.addedSugarWarning && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500 }}>
+              <AlertTriangle size={14} />
+              <span>Added sugar detected in today's logs. Keep intake low to preserve insulin sensitivity and training energy levels.</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Log buttons */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -326,13 +522,14 @@ export function FoodPage() {
                               })
                               setParsedEntries(prev => prev.map(item => item.id === e.id ? updated : item))
                             } else {
-                              const newFood = CURATED_FOODS.find(f => f.id === foodId) || null
+                              const resolved = resolveFoodById(foodId)
+                              const newFood = resolved ? resolved.food : null
                               const updated = recalculateProposed(e, {
                                 matchedFood: newFood,
                                 selectedServingSize: newFood?.servingSizes[0] || null,
                                 resolvedWeightG: newFood ? (e.raw.quantity * (newFood.servingSizes[0]?.weightG || 100)) : null,
                                 confidence: 'high',
-                                source: 'curated'
+                                source: resolved ? resolved.source : 'curated'
                               })
                               setParsedEntries(prev => prev.map(item => item.id === e.id ? updated : item))
                             }
@@ -344,8 +541,10 @@ export function FoodPage() {
                           {e.source === 'open_food_facts' && e.matchedFood && (
                             <option value={e.matchedFood.id}>{e.matchedFood.name} (OFF)</option>
                           )}
-                          {CURATED_FOODS.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
+                          {getAllFoods().map(rf => (
+                            <option key={rf.food.id} value={rf.food.id}>
+                              {rf.food.name} {rf.source === 'personal_chart' ? '🥇' : ''}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -702,7 +901,43 @@ export function FoodPage() {
                   {logs.map((log, i) => (
                     <div key={log.id} className="flex-between" style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none' }}>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 500 }}>{log.name}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span>{log.name}</span>
+                          {log.proteinQualityScore && (
+                            <span 
+                              style={{ 
+                                fontSize: 9, 
+                                padding: '1px 5px', 
+                                borderRadius: 4, 
+                                fontWeight: 600,
+                                background: 'rgba(var(--accent-rgb, 14, 165, 233), 0.1)',
+                                color: 'var(--accent)',
+                                border: '1px solid rgba(var(--accent-rgb, 14, 165, 233), 0.2)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 2
+                              }}
+                              title={`DIAAS score: ${Math.round(log.proteinQualityScore * 100)}%`}
+                            >
+                              🥇 DIAAS: {Math.round(log.proteinQualityScore * 100)}%
+                            </span>
+                          )}
+                          {log.nutritionSource === 'personal_chart' && (
+                            <span 
+                              style={{ 
+                                fontSize: 9, 
+                                padding: '1px 5px', 
+                                borderRadius: 4, 
+                                fontWeight: 600,
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                color: 'rgb(34, 197, 94)',
+                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                              }}
+                            >
+                              CHART
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                           {log.quantityG}g · {log.calories} kcal · {log.protein.toFixed(0)}g P · {log.carbs.toFixed(0)}g C · {log.fat.toFixed(0)}g F
                         </div>
@@ -727,18 +962,68 @@ export function FoodPage() {
 
 // ─── Food Search Result Card ─────────────────────────────────────────────────
 
-function FoodSearchResult({ item, onAdd }: { item: ExternalFoodResult; onAdd: (qty: number) => void }) {
+function FoodSearchResult({ item, onAdd }: { item: FoodSearchItem; onAdd: (qty: number) => void }) {
   const [qty, setQty] = useState(100)
+  const [selectedSize, setSelectedSize] = useState<string>('grams')
   const [expanded, setExpanded] = useState(false)
 
-  const calories = Math.round(item.caloriesPer100g * qty / 100)
-  const protein = (item.proteinPer100g * qty / 100).toFixed(1)
+  const servingSizes = item.servingSizes || []
+  
+  // Set default quantity and size based on availability of serving sizes
+  useEffect(() => {
+    if (servingSizes.length > 0) {
+      setSelectedSize(servingSizes[0].name)
+      setQty(1)
+    } else {
+      setSelectedSize('grams')
+      setQty(100)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item])
+
+  const activeWeightG = selectedSize === 'grams'
+    ? 1
+    : (servingSizes.find(s => s.name === selectedSize)?.weightG || 100)
+
+  const totalGrams = qty * activeWeightG
+  const ratio = totalGrams / 100
+
+  const calories = Math.round(item.caloriesPer100g * ratio)
+  const protein = (item.proteinPer100g * ratio).toFixed(1)
 
   return (
     <div style={{ padding: '10px 14px', background: 'var(--bg-base)', borderRadius: 10, border: '1px solid var(--border-subtle)' }}>
       <div className="flex-between">
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span>{item.name}</span>
+            {item.diaas !== null && (
+              <span 
+                style={{ 
+                  fontSize: 9, 
+                  padding: '1px 5px', 
+                  borderRadius: 4, 
+                  fontWeight: 600,
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  color: 'rgb(56, 189, 248)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                }}
+                title={`DIAAS score: ${Math.round(item.diaas * 100)}%`}
+              >
+                🥇 DIAAS: {Math.round(item.diaas * 100)}%
+              </span>
+            )}
+            {item.source === 'personal_chart' && (
+              <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 600, background: 'rgba(34, 197, 94, 0.1)', color: 'rgb(34, 197, 94)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                CHART
+              </span>
+            )}
+            {item.source === 'curated' && (
+              <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 600, background: 'rgba(168, 85, 247, 0.1)', color: 'rgb(168, 85, 247)', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                CURATED
+              </span>
+            )}
+          </div>
           {item.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.brand}</div>}
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
             <span style={{ color: 'var(--macro-calories)' }}>{item.caloriesPer100g} kcal</span> ·{' '}
@@ -752,23 +1037,50 @@ function FoodSearchResult({ item, onAdd }: { item: ExternalFoodResult; onAdd: (q
           <button onClick={() => setExpanded(!expanded)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
             <ChevronDown size={14} style={{ transform: expanded ? 'rotate(180deg)' : '', transition: '0.2s' }} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => onAdd(qty)}>
+          <button className="btn btn-primary btn-sm" onClick={() => onAdd(totalGrams)}>
             <Plus size={12} /> Add
           </button>
         </div>
       </div>
       {expanded && (
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <label style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Qty (g):</label>
-          <input
-            type="number"
-            value={qty}
-            onChange={(e) => setQty(Number(e.target.value))}
-            className="input"
-            style={{ width: 80, fontSize: 13 }}
-            min={1}
-          />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>= {calories} kcal · {protein}g P</span>
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Qty:</label>
+            <input
+              type="number"
+              value={qty}
+              onChange={(e) => setQty(Math.max(0.1, parseFloat(e.target.value) || 0))}
+              className="input"
+              style={{ width: 80, fontSize: 13, padding: '4px 8px', height: 'auto' }}
+              min={0.1}
+              step={selectedSize === 'grams' ? 10 : 0.5}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>Unit:</label>
+            <select
+              value={selectedSize}
+              onChange={(e) => {
+                const newSize = e.target.value
+                setSelectedSize(newSize)
+                if (newSize === 'grams') {
+                  setQty(100)
+                } else {
+                  setQty(1)
+                }
+              }}
+              className="input"
+              style={{ fontSize: 12, padding: '4px 8px', height: 'auto', width: 140 }}
+            >
+              <option value="grams">grams (g)</option>
+              {servingSizes.map(s => (
+                <option key={s.name} value={s.name}>{s.name} ({s.weightG}g)</option>
+              ))}
+            </select>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 'auto' }}>
+            = {calories} kcal · {protein}g P ({totalGrams.toFixed(0)}g total)
+          </span>
         </div>
       )}
     </div>

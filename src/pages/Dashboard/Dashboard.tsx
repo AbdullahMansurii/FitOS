@@ -1,17 +1,20 @@
+/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/purity, @typescript-eslint/no-unused-vars */
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Target, Scale, Utensils, Dumbbell, 
-  Plus, ChevronRight, Flame, Beef, Brain, Ruler
+  Plus, ChevronRight, Flame, Beef, Brain, Ruler, Heart, Moon, Footprints, Activity, Award
 } from 'lucide-react'
-import { useGoalsStore, useWeightStore, useFoodStore, useWorkoutStore, useProfileStore } from '@/store/index'
+import { useGoalsStore, useWeightStore, useFoodStore, useWorkoutStore, useProfileStore, useRecoveryStore } from '@/store/index'
 import { todayISO, formatDate, getTimeGreeting, calcGoalProgress, daysAgo } from '@/lib/utils'
 import { MacroRing } from '@/components/shared/MacroRing'
 import { WeightLogModal } from '@/components/shared/WeightLogModal'
 import { GoalSetupModal } from '@/components/shared/GoalSetupModal'
+import { RecoveryLogModal } from '@/components/shared/RecoveryLogModal'
 import { getCachedRecommendation } from '@/lib/progressiveOverload'
 import { getRecompositionReport } from '@/lib/recompositionIntelligence'
 import { getNutritionRecommendation } from '@/lib/nutritionIntelligence'
+import { calculateRecoveryScore } from '@/lib/recoveryIntelligence'
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
   successful_recomp: { label: 'Recomping Successfully', color: 'var(--emerald)', bg: 'rgba(16,185,129,0.1)', icon: '🟢' },
@@ -48,9 +51,11 @@ export function Dashboard() {
   const foodLogs = useFoodStore((s) => s.foodLogs)
   const sessions = useWorkoutStore((s) => s.sessions)
   const exercises = useWorkoutStore((s) => s.exercises)
+  const getRecoveryByDate = useRecoveryStore((s) => s.getByDate)
 
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [showGoalModal, setShowGoalModal] = useState(false)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
 
   const today = todayISO()
   const greeting = getTimeGreeting()
@@ -59,6 +64,7 @@ export function Dashboard() {
   const todayWeight = getByDate(today)
   const todayLogs = getLogsByDate(today)
   const recentWeights = getRange(daysAgo(30), today)
+  const todayRecovery = getRecoveryByDate(today)
 
   const recompReport = useMemo(() => {
     return getRecompositionReport(measurements, weightLogs, sessions)
@@ -218,6 +224,47 @@ export function Dashboard() {
     ? (recentWeights[recentWeights.length - 1].weightKg - recentWeights[0].weightKg).toFixed(1)
     : null
 
+  // Recovery calculations
+  const calculatedRecovery = useMemo(() => {
+    return calculateRecoveryScore(todayRecovery)
+  }, [todayRecovery])
+
+  // Consistency Streak
+  const consistencyStreak = useMemo(() => {
+    const activeDates = new Set<string>()
+    foodLogs.forEach(l => activeDates.add(l.date))
+    weightLogs.forEach(l => activeDates.add(l.date))
+    
+    // Retrieve recoveryLogs from state
+    const recoveryLogs = useRecoveryStore.getState().recoveryLogs
+    recoveryLogs.forEach(l => activeDates.add(l.date))
+    sessions.forEach(s => activeDates.add(s.date))
+
+    let streak = 0
+    let checkDate = new Date()
+    
+    const todayStr = checkDate.toISOString().split('T')[0]
+    if (!activeDates.has(todayStr)) {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+      if (!activeDates.has(yesterdayStr)) {
+        return 0
+      }
+      checkDate = yesterday
+    }
+    
+    while (true) {
+      const dateStr = checkDate.toISOString().split('T')[0]
+      if (activeDates.has(dateStr)) {
+        streak++
+        checkDate.setDate(checkDate.getDate() - 1)
+      } else {
+        break
+      }
+    }
+    return streak
+  }, [foodLogs, weightLogs, sessions])
+
   const greetingText = {
     morning: `Good morning, ${profile?.displayName || 'Champion'}! 🌅`,
     afternoon: `Good afternoon, ${profile?.displayName || 'Champion'}! ☀️`,
@@ -225,93 +272,134 @@ export function Dashboard() {
   }[greeting]
 
   return (
-    <div className="page-container animate-fade-in" style={{ maxWidth: 1100 }}>
+    <div className="page-container animate-fade-in" style={{ maxWidth: 1100, paddingBottom: 60 }}>
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-          {greetingText}
-        </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>
-          {formatDate(today, 'long')}
-        </p>
-      </div>
-
-      {/* Top stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        {/* Weight */}
-        <div
-          className="card-elevated"
-          style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
-          onClick={() => setShowWeightModal(true)}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-        >
-          <div className="flex-between" style={{ marginBottom: 12 }}>
-            <Scale size={18} color="var(--accent)" />
-            <span className="badge badge-accent" style={{ fontSize: 11 }}>
-              {todayWeight ? 'Logged' : 'Log Today'}
+      <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', display: 'inline-block' }}>
+            {greetingText}
+          </h1>
+          {consistencyStreak > 0 && (
+            <span 
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#ef4444',
+                padding: '4px 10px',
+                borderRadius: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                marginLeft: 12,
+                verticalAlign: 'middle',
+                border: '1px solid rgba(239, 68, 68, 0.15)'
+              }}
+              title="Consecutive days logging food, weight, or training!"
+            >
+              🔥 {consistencyStreak} day streak
             </span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-            {latestWeight ? `${latestWeight.weightKg}` : '—'}
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>kg</span>
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {latestWeight ? `Last: ${formatDate(latestWeight.date, 'short')}` : 'No weight logged'}
-            {weightTrend !== null && ` · ${Number(weightTrend) > 0 ? '+' : ''}${weightTrend}kg/30d`}
+          )}
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
+            {formatDate(today, 'long')}
           </p>
         </div>
+      </div>
 
-        {/* Calories */}
-        <div className="card-elevated">
+      {/* Redesigned Premium Top Stats Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {/* Calories Card */}
+        <div className="card-elevated" style={{ position: 'relative', overflow: 'hidden' }}>
           <div className="flex-between" style={{ marginBottom: 12 }}>
-            <Flame size={18} color="var(--macro-calories)" />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{caloriePct}%</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--macro-calories)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Calories</span>
+            <span className="badge badge-red" style={{ fontSize: 10 }}>
+              {caloriePct >= 100 ? 'Target Reached' : `${calorieTarget - todayNutrition.calories} kcal left`}
+            </span>
           </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
             {todayNutrition.calories}
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>/ {calorieTarget}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 6 }}>/ {calorieTarget} kcal</span>
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>kcal today</p>
-          <div style={{ height: 3, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 10 }}>
-            <div style={{ height: '100%', width: `${caloriePct}%`, background: caloriePct >= 100 ? 'var(--red)' : 'var(--macro-calories)', borderRadius: 9999, transition: 'width 0.5s ease' }} />
+          <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 12 }}>
+            <div style={{ height: '100%', width: `${caloriePct}%`, background: 'var(--macro-calories)', borderRadius: 9999, transition: 'width 0.5s ease' }} />
           </div>
         </div>
 
-        {/* Protein */}
-        <div className="card-elevated">
+        {/* Protein Card */}
+        <div className="card-elevated" style={{ position: 'relative', overflow: 'hidden' }}>
           <div className="flex-between" style={{ marginBottom: 12 }}>
-            <Beef size={18} color="var(--macro-protein)" />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{proteinPct}%</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--macro-protein)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Protein</span>
+            <span className="badge badge-blue" style={{ fontSize: 10 }}>
+              {proteinPct >= 100 ? 'Target Met' : `${Math.round(proteinTarget - todayNutrition.protein)}g left`}
+            </span>
           </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
             {todayNutrition.protein.toFixed(0)}
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>/ {proteinTarget}g</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 6 }}>/ {proteinTarget}g</span>
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>protein today</p>
-          <div style={{ height: 3, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 10 }}>
+          <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 9999, marginTop: 12 }}>
             <div style={{ height: '100%', width: `${proteinPct}%`, background: 'var(--macro-protein)', borderRadius: 9999, transition: 'width 0.5s ease' }} />
           </div>
         </div>
 
-        {/* Workouts this week */}
-        <div className="card-elevated">
+        {/* Recovery Score Card */}
+        <div
+          className="card-elevated hover-glow"
+          style={{ cursor: 'pointer', borderLeft: `3px solid ${calculatedRecovery.color}`, transition: 'all 0.2s ease' }}
+          onClick={() => setShowRecoveryModal(true)}
+        >
+          <div className="flex-between" style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recovery Score</span>
+            <span 
+              className="badge" 
+              style={{ 
+                fontSize: 10, 
+                backgroundColor: calculatedRecovery.status === 'excellent' ? 'rgba(34, 197, 94, 0.1)' : calculatedRecovery.status === 'good' ? 'rgba(56, 189, 248, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                color: calculatedRecovery.color
+              }}
+            >
+              {todayRecovery ? 'Logged' : 'Pending Log'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: calculatedRecovery.color }}>
+              {calculatedRecovery.score}%
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>{calculatedRecovery.statusLabel}</span>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {todayRecovery ? (
+              `Sleep: ${todayRecovery.sleepHours ?? '—'}h · Steps: ${((todayRecovery.dailySteps || 0)/1000).toFixed(1)}k · Energy: ${todayRecovery.energy}/5`
+            ) : 'Click to log steps, sleep, & wellness.'}
+          </p>
+        </div>
+
+        {/* Weight / Goal Card */}
+        <div
+          className="card-elevated hover-glow"
+          style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+          onClick={() => setShowWeightModal(true)}
+        >
           <div className="flex-between" style={{ marginBottom: 12 }}>
-            <Dumbbell size={18} color="var(--purple)" />
-            <span className="badge badge-purple">{weekWorkouts} this week</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Body Weight</span>
+            <span className="badge badge-accent" style={{ fontSize: 10 }}>
+              {todayWeight ? 'Logged' : 'Log Today'}
+            </span>
           </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-            {sessions.length}
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>total</span>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+            {latestWeight ? latestWeight.weightKg : '—'}
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 4 }}>kg</span>
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {recentWorkout ? `Last: ${formatDate(recentWorkout.date, 'short')}` : 'No workouts yet'}
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+            {activeGoal ? (
+              `${activeGoal.type.toUpperCase()}: ${activeGoal.startWeight}kg → ${activeGoal.targetWeight}kg (${goalProgress}% done)`
+            ) : 'No active goal set.'}
           </p>
         </div>
       </div>
 
       {/* Main content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+      <div className="dashboard-grid">
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Active Goal */}
@@ -781,6 +869,7 @@ export function Dashboard() {
       {/* Modals */}
       {showWeightModal && <WeightLogModal onClose={() => setShowWeightModal(false)} />}
       {showGoalModal && <GoalSetupModal onClose={() => setShowGoalModal(false)} />}
+      {showRecoveryModal && <RecoveryLogModal onClose={() => setShowRecoveryModal(false)} />}
     </div>
   )
 }

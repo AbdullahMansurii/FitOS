@@ -474,51 +474,105 @@ export function WorkoutPage() {
               )}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
-              {searchExercises(exercises, exercisesSearchQuery).map((ex) => (
-                <div key={ex.id} className="card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}</div>
-                      {ex.isCustom && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete custom exercise "${ex.name}"?`)) {
-                              deleteExercise(ex.id)
-                            }
-                          }}
-                          style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: 2, opacity: 0.7 }}
-                          title="Delete Custom Exercise"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
+              {searchExercises(exercises, exercisesSearchQuery).map((ex) => {
+                const intel = getExerciseIntelligence(ex.id, sessions)
+                const rec = recommendationsMap[ex.id]
+                
+                // Find last session set
+                const lastSessionWithEx = sessions.find(s => 
+                  s.completedAt && s.exercises.some(se => se.exerciseId === ex.id)
+                )
+                const lastSe = lastSessionWithEx?.exercises.find(se => se.exerciseId === ex.id)
+                const lastSet = lastSe?.sets.filter(s => !s.isWarmup).sort((a, b) => b.weightKg - a.weightKg)[0]
+
+                return (
+                  <div key={ex.id} className="card-elevated hover-glow" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{ex.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {intel.trends30d.e1rmPctChange !== null && (
+                            <span 
+                              style={{ 
+                                fontSize: 10, 
+                                fontWeight: 700, 
+                                color: intel.trends30d.e1rmPctChange >= 0 ? 'var(--emerald)' : 'var(--red)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 1
+                              }}
+                              title="30-day estimated 1RM trend"
+                            >
+                              {intel.trends30d.e1rmPctChange >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+                              {Math.abs(intel.trends30d.e1rmPctChange)}%
+                            </span>
+                          )}
+                          {ex.isCustom && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete custom exercise "${ex.name}"?`)) {
+                                  deleteExercise(ex.id)
+                                }
+                              }}
+                              style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: 2, opacity: 0.7 }}
+                              title="Delete Custom Exercise"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ex.muscleGroups.join(', ')}</div>
+
+                      {/* Overload Analytics Panel */}
+                      <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-base)', borderRadius: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Best (e1RM):</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {intel.personalRecords.highestE1RM ? `${Math.round(intel.personalRecords.highestE1RM.value)}kg` : '—'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Previous Set:</span>
+                          <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
+                            {lastSet ? `${lastSet.weightKg}kg × ${lastSet.reps}` : '—'}
+                          </span>
+                        </div>
+                        {rec && rec.recommendationType !== 'insufficient_data' && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-subtle)', paddingTop: 6, marginTop: 2 }}>
+                            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Next Target:</span>
+                            <span style={{ fontWeight: 800, color: 'var(--accent)' }}>
+                              {rec.suggestedWeight}kg × {rec.suggestedReps} reps
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ex.muscleGroups.join(', ')}</div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className="badge badge-muted" style={{ fontSize: 10, textTransform: 'capitalize' }}>{ex.category}</span>
-                      {ex.equipment && <span className="badge badge-muted" style={{ fontSize: 10 }}>{ex.equipment}</span>}
-                      {ex.isCustom && <span className="badge badge-amber" style={{ fontSize: 10 }}>Custom</span>}
-                      {recommendationsMap[ex.id]?.fatigueWarning && (
-                        <span className="badge badge-red" style={{ fontSize: 9 }}>⚠ Fatigue</span>
-                      )}
-                      {recommendationsMap[ex.id]?.stallDetected && (
-                        <span className="badge badge-amber" style={{ fontSize: 9 }}>⚠ Plateau</span>
-                      )}
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span className="badge badge-muted" style={{ fontSize: 9, textTransform: 'capitalize' }}>{ex.category}</span>
+                        {ex.equipment && <span className="badge badge-muted" style={{ fontSize: 9 }}>{ex.equipment}</span>}
+                        {rec?.fatigueWarning && (
+                          <span className="badge badge-red" style={{ fontSize: 9 }}>⚠ Fatigue</span>
+                        )}
+                        {rec?.stallDetected && (
+                          <span className="badge badge-amber" style={{ fontSize: 9 }}>⚠ Stall</span>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setSelectedAnalyticsExId(ex.id)}
+                        style={{ padding: '4px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                        title="View Exercise Analytics"
+                      >
+                        <BarChart2 size={12} /> Details
+                      </button>
                     </div>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setSelectedAnalyticsExId(ex.id)}
-                      style={{ padding: '4px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                      title="View Exercise Analytics"
-                    >
-                      <BarChart2 size={12} /> Analytics
-                    </button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

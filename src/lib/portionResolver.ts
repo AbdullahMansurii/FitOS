@@ -1,4 +1,3 @@
-import { CURATED_FOODS } from '@/constants/foodDatabase'
 import type { CuratedFood } from '@/types'
 
 // Normalizes and singularizes unit strings
@@ -34,29 +33,14 @@ export function normalizeUnit(unit: string): string {
   return u
 }
 
+import { resolveFood } from './nutritionResolver'
+
 // Find matched food from database using layered matching rules to avoid circular dependency
 function findMatchedFood(foodName: string): CuratedFood | null {
-  const q = foodName.toLowerCase().trim()
-  if (!q) return null
-
-  // 1. Exact name match
-  let match = CURATED_FOODS.find((f) => f.name.toLowerCase() === q)
-  if (match) return match
-
-  // 2. Exact alias match
-  match = CURATED_FOODS.find((f) => f.aliases.some((a) => a.toLowerCase() === q))
-  if (match) return match
-
-  // 3. Substring match
-  match = CURATED_FOODS.find((f) => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()))
-  if (match) return match
-
-  // 4. Substring alias match
-  match = CURATED_FOODS.find((f) => f.aliases.some((a) => a.toLowerCase().includes(q) || q.includes(a.toLowerCase())))
-  if (match) return match
-
-  return null
+  const resolved = resolveFood(foodName)
+  return resolved ? resolved.food : null
 }
+
 
 export interface PortionResolution {
   weightG: number | null

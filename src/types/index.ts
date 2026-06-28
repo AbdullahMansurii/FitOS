@@ -10,6 +10,9 @@ export type AIProvider = 'groq' | 'openai' | 'gemini' | 'anthropic'
 export type WeightUnit = 'kg' | 'lbs'
 export type EnergyUnit = 'kcal' | 'kj'
 
+export type GoalMode = 'fat_loss' | 'aggressive_cut' | 'lean_bulk' | 'muscle_gain' | 'recomp' | 'maintain'
+export type ActivityLevel = 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'athlete'
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export interface Profile {
@@ -40,6 +43,13 @@ export interface Goal {
   notes?: string
   createdAt: string
   updatedAt: string
+  // New fields for auto-calculation
+  goalMode?: GoalMode
+  activityLevel?: ActivityLevel
+  carbTarget?: number
+  fatTarget?: number
+  tdeeEstimate?: number
+  deficitSurplus?: number
 }
 
 // ─── Weight ──────────────────────────────────────────────────────────────────
@@ -63,13 +73,13 @@ export interface Measurement {
   hipsCm?: number
   armsCm?: number
   thighsCm?: number
-  calvesCm?: number
-  weightKg?: number
   leftArmCm?: number
   rightArmCm?: number
   leftThighCm?: number
   rightThighCm?: number
+  calvesCm?: number
   neckCm?: number
+  weightKg?: number
   notes?: string
 }
 
@@ -112,7 +122,8 @@ export interface ProposedFoodLog {
   calculatedCarbs: number
   calculatedFat: number
   confidence: 'high' | 'medium' | 'low'
-  source: 'curated' | 'custom' | 'open_food_facts' | 'ai_estimated'
+  source: 'personal_chart' | 'curated' | 'custom' | 'open_food_facts' | 'ai_estimated'
+  diaas?: number | null
 }
 
 export interface FoodItem {
@@ -129,6 +140,8 @@ export interface FoodItem {
   barcode?: string
   source: 'manual' | 'openfoodfacts' | 'usda' | 'seeded'
   isCustom: boolean
+  proteinQualityScore?: number | null
+  proteinQualityMethod?: string
 }
 
 export interface FoodLog {
@@ -145,6 +158,11 @@ export interface FoodLog {
   fat: number
   notes?: string
   createdAt: string
+  // New fields for protein quality and source tracking
+  proteinQualityScore?: number | null
+  proteinQualityMethod?: string
+  nutritionSource?: string
+  savedMealVersion?: number
 }
 
 export interface SavedMeal {
@@ -157,6 +175,18 @@ export interface SavedMeal {
   totalCarbs: number
   totalFat: number
   createdAt: string
+  // New fields for Saved Meals v2
+  category?: string
+  totalFiber?: number
+  proteinQualityScore?: number | null
+  proteinQualityMethod?: string
+  usageCount?: number
+  lastUsedAt?: string
+  version?: number
+  parentMealId?: string
+  isCurrent?: boolean
+  updatedAt?: string
+  isPinned?: boolean
 }
 
 export interface SavedMealItem {
@@ -431,3 +461,29 @@ export interface ProgressionRecommendation {
   weeklyFrequency: number
   reason: string
 }
+
+// ─── Recovery Tracking ───────────────────────────────────────────────────────
+
+export interface RecoveryLog {
+  id: string
+  date: string
+  dailySteps: number | null
+  sleepHours: number | null
+  mood?: number | null // 1-5
+  energy?: number | null // 1-5
+  muscleSoreness?: number | null // 1-5
+  notes?: string
+  createdAt?: string
+}
+
+// ─── Photo Progress ──────────────────────────────────────────────────────────
+
+export interface ProgressPhoto {
+  id: string
+  date: string
+  photoType: 'front' | 'left' | 'right' | 'back'
+  photoData: string // base64 URL
+  notes?: string
+  createdAt?: string
+}
+

@@ -1,6 +1,7 @@
 import type { AIProvider, NutritionSummary, AIExtractedFood } from '@/types'
-import type { Goal, WeightLog, WorkoutSession, Memory, Profile } from '@/types'
+import type { Goal, WeightLog, WorkoutSession, Memory, Profile, RecoveryLog } from '@/types'
 import { ABDULLAH_FITNESS_PROFILE } from '@/constants/fitnessProfile'
+import { calculateRecoveryScore } from './recoveryIntelligence'
 
 function calculateAge(dobString: string): number {
   const dob = new Date(dobString + 'T00:00:00')
@@ -23,6 +24,7 @@ export interface FitnessContext {
   todayNutrition: NutritionSummary
   targetNutrition: { calories: number; protein: number }
   recentWorkouts: WorkoutSession[]
+  recentRecovery?: RecoveryLog[]
   memories: Memory[]
   todayDate: string
   trainingIntelligence?: string
@@ -67,6 +69,15 @@ export function buildSystemPrompt(context: FitnessContext): string {
     .map((w) => `  • ${w.date}: ${w.name}${w.durationSeconds ? ` (${Math.round(w.durationSeconds / 60)}min)` : ''}${w.totalVolume ? `, ${Math.round(w.totalVolume)}kg vol` : ''}${w.rating ? ` ⭐${w.rating}/5` : ''}`)
     .join('\n')
 
+  // Recovery Trends (last 7 logs)
+  const recoveryList = context.recentRecovery || []
+  const recoverySection = recoveryList.slice(-7)
+    .map((r) => {
+      const rec = calculateRecoveryScore(r)
+      return `  • ${r.date}: Score: ${rec.score}/100 (${rec.statusLabel}), Sleep: ${r.sleepHours ?? '—'}h, Steps: ${r.dailySteps ?? '—'} steps, Mood: ${r.mood ?? '—'}/5, Energy: ${r.energy ?? '—'}/5, Soreness: ${r.muscleSoreness ?? '—'}/5${r.notes ? ` (${r.notes})` : ''}`
+    })
+    .join('\n')
+
   // Macro compliance
   const calTarget = context.targetNutrition.calories || 2400
   const protTarget = context.targetNutrition.protein || 180
@@ -88,6 +99,10 @@ export function buildSystemPrompt(context: FitnessContext): string {
 
 COACHING PERSONA:
 You are 50% elite strength coach + 50% data analyst. Be direct, objective, and evidence-based.
+- For every training, nutrition, or recovery recommendation, provide a structured reasoning flow explaining:
+  1. **WHAT** to do (actionable directive)
+  2. **WHY** to do it (citing specific numbers, logs, and trends from the data below)
+  3. **EXPECTED OUTCOME** (what biological or performance response to expect)
 - Base ALL advice on Abdullah's actual logged data — never give generic guidance
 - Use numbers, percentages, and trends in every response
 - If data is insufficient, explicitly state what is missing and ask for it
@@ -133,6 +148,9 @@ TODAY'S NUTRITION:
 
 TRAINING (last 7 sessions | ${workoutsThisWeek.length} this week):
 ${recentWorkoutList || '  No sessions logged yet.'}
+
+RECOVERY & WELL-BEING (last 7 logs):
+${recoverySection || '  No recovery logs recorded recently.'}
 
 ━━━ TRAINING INTELLIGENCE & PROGRESSION ━━━━━━━━━━━━━━━━━━
 ${context.trainingIntelligence || '  No training intelligence data available.'}

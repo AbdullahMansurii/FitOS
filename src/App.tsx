@@ -11,6 +11,8 @@ import { ProgressPage } from '@/pages/Progress/ProgressPage'
 import { CoachPage } from '@/pages/Coach/CoachPage'
 import { SettingsPage } from '@/pages/Settings/SettingsPage'
 import { MeasurementsPage } from '@/pages/Measurements/MeasurementsPage'
+import { SavedMealsPage } from '@/pages/SavedMeals/SavedMealsPage'
+
 import { pullAll, schedulePush, isSupabaseReachable } from '@/lib/sync'
 import { seedUserContext } from '@/lib/contextSeed'
 
@@ -59,6 +61,7 @@ export default function App() {
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/food" element={<FoodPage />} />
+                  <Route path="/meals" element={<SavedMealsPage />} />
                   <Route path="/workout" element={<WorkoutPage />} />
                   <Route path="/progress" element={<ProgressPage />} />
                   <Route path="/coach" element={<CoachPage />} />

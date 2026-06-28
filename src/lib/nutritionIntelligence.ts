@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-assignment, prefer-const, @typescript-eslint/no-unused-vars */
 import type { Goal, WeightLog, FoodLog, WorkoutSession, Profile, Measurement } from '@/types'
 import { getExerciseIntelligence } from './exerciseIntelligence'
 
@@ -430,4 +431,241 @@ Nutrition Adherence & Averages (from logged days only):
 - 7d Adherence: Calories ${analytics.calorieAdherence7d}%, Protein ${analytics.proteinAdherence7d}%
 - 30d Adherence: Calories ${analytics.calorieAdherence30d}%, Protein ${analytics.proteinAdherence30d}%
 `.trim()
+}
+
+export interface ExtractedNutrients {
+  diaas: number | null // 0-2 scale
+  fiber: number // g
+  isFruitOrVeg: boolean
+  fruitVegServings: number // servings (80g = 1 serving)
+  omega3: number // g
+  satFat: number // g
+  addedSugar: boolean // warning flag
+  sugarG: number // g
+}
+
+export function estimateNutrients(name: string, quantityG: number, logDiaas: number | null = null): ExtractedNutrients {
+  const n = name.toLowerCase().trim()
+  
+  // 1. DIAAS Score
+  let diaas: number | null = logDiaas
+  if (diaas === null) {
+    if (n.includes('whey') || n.includes('egg') || n.includes('milk') || n.includes('curd') || n.includes('yogurt') || n.includes('paneer') || n.includes('chicken') || n.includes('fish') || n.includes('mutton') || n.includes('beef')) {
+      diaas = 1.15
+    } else if (n.includes('soya') || n.includes('tofu')) {
+      diaas = 0.90
+    } else if (n.includes('dal') || n.includes('lentil') || n.includes('chana') || n.includes('chole') || n.includes('rajma') || n.includes('beans')) {
+      diaas = 0.75
+    } else if (n.includes('roti') || n.includes('chapati') || n.includes('wheat') || n.includes('rice') || n.includes('oats')) {
+      diaas = 0.55
+    }
+  }
+
+  // 2. Fiber (g per 100g estimate)
+  let fiberPer100 = 0
+  if (n.includes('oat') || n.includes('muesli')) fiberPer100 = 10
+  else if (n.includes('roti') || n.includes('chapati') || n.includes('wheat') || n.includes('thepla') || n.includes('paratha')) fiberPer100 = 7
+  else if (n.includes('dal') || n.includes('lentil') || n.includes('chana') || n.includes('chole') || n.includes('rajma') || n.includes('beans') || n.includes('besan')) fiberPer100 = 8
+  else if (n.includes('soya chunks') || n.includes('soy chunks')) fiberPer100 = 15
+  else if (n.includes('brown rice')) fiberPer100 = 2
+  else if (n.includes('chia') || n.includes('flax') || n.includes('almond') || n.includes('walnut') || n.includes('nuts') || n.includes('peanut')) fiberPer100 = 10
+  else if (n.includes('apple') || n.includes('banana') || n.includes('orange') || n.includes('mango') || n.includes('papaya') || n.includes('guava') || n.includes('fruit')) fiberPer100 = 2.4
+  else if (n.includes('palak') || n.includes('spinach') || n.includes('bhindi') || n.includes('okra') || n.includes('aloo gobhi') || n.includes('mix veg') || n.includes('sabzi') || n.includes('salad') || n.includes('vegetable')) fiberPer100 = 3
+  
+  const fiber = (fiberPer100 * quantityG) / 100
+
+  // 3. Fruits & Vegetables
+  let isFruitOrVeg = false
+  if (
+    n.includes('apple') || n.includes('banana') || n.includes('orange') || n.includes('mango') || 
+    n.includes('papaya') || n.includes('guava') || n.includes('fruit') || n.includes('berries') || 
+    n.includes('strawberry') || n.includes('palak') || n.includes('spinach') || n.includes('bhindi') || 
+    n.includes('okra') || n.includes('aloo gobhi') || n.includes('mix veg') || n.includes('sabzi') || 
+    n.includes('salad') || n.includes('vegetable') || n.includes('cucumber') || n.includes('tomato') || 
+    n.includes('carrot') || n.includes('broccoli') || n.includes('cauliflower') || n.includes('cabbage') || 
+    n.includes('gourd') || n.includes('tinda')
+  ) {
+    if (!n.includes('juice') && !n.includes('oil') && !n.includes('fried') && !n.includes('roti')) {
+      isFruitOrVeg = true
+    }
+  }
+  const fruitVegServings = isFruitOrVeg ? quantityG / 80 : 0
+
+  // 4. Omega-3 (g per 100g estimate)
+  let omega3Per100 = 0
+  if (n.includes('chia')) omega3Per100 = 17
+  else if (n.includes('flax')) omega3Per100 = 22
+  else if (n.includes('walnut')) omega3Per100 = 9
+  else if (n.includes('salmon') || n.includes('tuna') || n.includes('mackerel') || n.includes('sardine') || n.includes('fish')) omega3Per100 = 1.5
+  else if (n.includes('egg')) omega3Per100 = 0.1
+  else if (n.includes('cod liver')) omega3Per100 = 20
+  
+  const omega3 = (omega3Per100 * quantityG) / 100
+
+  // 5. Saturated Fat (g per 100g estimate)
+  let satFatPer100 = 0
+  if (n.includes('paneer')) satFatPer100 = 14
+  else if (n.includes('cheese') && !n.includes('cottage')) satFatPer100 = 18
+  else if (n.includes('butter') && !n.includes('peanut')) satFatPer100 = 51
+  else if (n.includes('ghee')) satFatPer100 = 60
+  else if (n.includes('milk') || n.includes('curd') || n.includes('yogurt')) satFatPer100 = 2.0
+  else if (n.includes('mutton') || n.includes('lamb') || n.includes('beef') || n.includes('pork')) satFatPer100 = 5
+  else if (n.includes('chicken thigh')) satFatPer100 = 2.5
+  else if (n.includes('egg whole') || (n.includes('egg') && !n.includes('white'))) satFatPer100 = 3
+  else if (n.includes('coconut oil')) satFatPer100 = 85
+  else if (n.includes('palm oil')) satFatPer100 = 49
+  
+  const satFat = (satFatPer100 * quantityG) / 100
+
+  // 6. Added Sugar & Sugar warning
+  let sugarPer100 = 0
+  let addedSugar = false
+  if (n.includes('sugar') || n.includes('honey') || n.includes('jaggery') || n.includes('maple') || n.includes('syrup')) {
+    sugarPer100 = 80
+    addedSugar = true
+  } else if (n.includes('soda') || n.includes('cola') || n.includes('cold drink') || n.includes('sprite') || n.includes('pepsi')) {
+    sugarPer100 = 10
+    addedSugar = true
+  } else if (n.includes('chocolate') || n.includes('cookie') || n.includes('cake') || n.includes('donut') || n.includes('pastry') || n.includes('ice cream') || n.includes('sweet') || n.includes('mithai') || n.includes('halwa') || n.includes('kheer')) {
+    sugarPer100 = 30
+    addedSugar = true
+  } else if (n.includes('ketchup') || n.includes('sauce') || n.includes('jam')) {
+    sugarPer100 = 20
+    addedSugar = true
+  }
+  const sugarG = (sugarPer100 * quantityG) / 100
+
+  return {
+    diaas: diaas !== null ? (diaas > 5 ? diaas / 100 : diaas) : null,
+    fiber,
+    isFruitOrVeg,
+    fruitVegServings,
+    omega3,
+    satFat,
+    addedSugar,
+    sugarG
+  }
+}
+
+export interface DailyNutritionReport {
+  date: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+  avgDiaas: number | null
+  proteinQualityGrade: 'Exceptional' | 'Good' | 'Fair' | 'Poor' | 'N/A'
+  fruitVegServings: number
+  omega3: number
+  satFat: number
+  satFatCaloriesPct: number
+  sugarG: number
+  addedSugarWarning: boolean
+  qualityScore: number // 0-100
+}
+
+export function calculateDailyNutritionReport(
+  date: string,
+  logs: FoodLog[],
+  calorieTarget: number,
+  proteinTarget: number
+): DailyNutritionReport {
+  let calories = 0
+  let protein = 0
+  let carbs = 0
+  let fat = 0
+  let fiber = 0
+  let totalProteinForDiaas = 0
+  let weightedDiaasSum = 0
+  let fruitVegServings = 0
+  let omega3 = 0
+  let satFat = 0
+  let sugarG = 0
+  let addedSugarWarning = false
+
+  logs.forEach(l => {
+    calories += l.calories
+    protein += l.protein
+    carbs += l.carbs
+    fat += l.fat
+
+    const est = estimateNutrients(l.name, l.quantityG, l.proteinQualityScore)
+    fiber += est.fiber
+    fruitVegServings += est.fruitVegServings
+    omega3 += est.omega3
+    satFat += est.satFat
+    sugarG += est.sugarG
+    if (est.addedSugar) addedSugarWarning = true
+
+    if (est.diaas !== null) {
+      weightedDiaasSum += est.diaas * l.protein
+      totalProteinForDiaas += l.protein
+    }
+  })
+
+  const avgDiaas = totalProteinForDiaas > 0 ? weightedDiaasSum / totalProteinForDiaas : null
+
+  let proteinQualityGrade: DailyNutritionReport['proteinQualityGrade'] = 'N/A'
+  if (avgDiaas !== null) {
+    if (avgDiaas >= 1.05) proteinQualityGrade = 'Exceptional'
+    else if (avgDiaas >= 0.85) proteinQualityGrade = 'Good'
+    else if (avgDiaas >= 0.65) proteinQualityGrade = 'Fair'
+    else proteinQualityGrade = 'Poor'
+  }
+
+  let calorieScore = 0
+  if (calories > 0) {
+    const deviation = Math.abs(calories - calorieTarget) / calorieTarget
+    calorieScore = Math.max(0, Math.min(100, Math.round((1 - deviation) * 100)))
+  }
+
+  let proteinScore = 0
+  if (proteinTarget > 0) {
+    const ratio = protein / proteinTarget
+    proteinScore = ratio >= 0.9 ? 100 : Math.round(ratio * 100)
+  }
+
+  let diaasScore = 0
+  if (avgDiaas !== null) {
+    diaasScore = Math.min(100, Math.round(Math.max(0, avgDiaas) * 100))
+  } else {
+    diaasScore = 60
+  }
+
+  let fiberScore = Math.min(100, Math.round((fiber / 30) * 100))
+  let fruitVegScore = Math.min(100, Math.round((fruitVegServings / 5) * 100))
+
+  const satFatCalories = satFat * 9
+  const satFatCaloriesPct = calories > 0 ? (satFatCalories / calories) * 100 : 0
+  const satFatScore = satFatCaloriesPct <= 10 ? 100 : Math.max(0, Math.round(100 - (satFatCaloriesPct - 10) * 10))
+
+  const sugarScore = addedSugarWarning ? 50 : 100
+
+  const qualityScore = Math.round(
+    calorieScore * 0.20 +
+    proteinScore * 0.20 +
+    diaasScore * 0.15 +
+    fiberScore * 0.15 +
+    fruitVegScore * 0.15 +
+    (satFatScore * 0.075 + sugarScore * 0.075)
+  )
+
+  return {
+    date,
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10,
+    fiber: Math.round(fiber * 10) / 10,
+    avgDiaas: avgDiaas ? Math.round(avgDiaas * 100) / 100 : null,
+    proteinQualityGrade,
+    fruitVegServings: Math.round(fruitVegServings * 10) / 10,
+    omega3: Math.round(omega3 * 100) / 100,
+    satFat: Math.round(satFat * 10) / 10,
+    satFatCaloriesPct: Math.round(satFatCaloriesPct),
+    sugarG: Math.round(sugarG * 10) / 10,
+    addedSugarWarning,
+    qualityScore: calories === 0 ? 0 : qualityScore
+  }
 }

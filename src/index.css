@@ -508,3 +508,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 .recharts-text { fill: var(--text-muted) !important; font-size: 12px; }
 .recharts-tooltip-wrapper { border-radius: var(--radius-md) !important; }
+
+/* ─── Responsive Dashboard Grid ─── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

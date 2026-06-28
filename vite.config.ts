@@ -21,8 +21,8 @@ export default defineConfig({
           'vendor-charts': ['recharts'],
           // Supabase client
           'vendor-supabase': ['@supabase/supabase-js'],
-          // Animation + icons
-          'vendor-ui': ['framer-motion', 'lucide-react'],
+          // Icons
+          'vendor-ui': ['lucide-react'],
           // State
           'vendor-state': ['zustand'],
         },

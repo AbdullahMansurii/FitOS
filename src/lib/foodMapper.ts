@@ -1,60 +1,30 @@
-import { CURATED_FOODS } from '@/constants/foodDatabase'
-import type { CuratedFood, AIExtractedFood, ProposedFoodLog, ServingSize } from '@/types'
+import type { AIExtractedFood, ProposedFoodLog, ServingSize } from '@/types'
 import { generateId } from './utils'
 import { resolvePortionWeight, normalizeUnit } from './portionResolver'
-
-// Find the best match from the local food database with details for confidence calculation
-export interface MatchDetails {
-  food: CuratedFood | null
-  matchType: 'exact' | 'substring' | 'none'
-}
-
-export function findBestLocalMatchWithDetails(query: string): MatchDetails {
-  const q = query.toLowerCase().trim()
-  if (!q) return { food: null, matchType: 'none' }
-
-  // 1. Exact name match
-  let match = CURATED_FOODS.find((f) => f.name.toLowerCase() === q)
-  if (match) return { food: match, matchType: 'exact' }
-
-  // 2. Exact alias match
-  match = CURATED_FOODS.find((f) => f.aliases.some((a) => a.toLowerCase() === q))
-  if (match) return { food: match, matchType: 'exact' }
-
-  // 3. Substring match (query is part of name or vice-versa)
-  match = CURATED_FOODS.find((f) => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()))
-  if (match) return { food: match, matchType: 'substring' }
-
-  // 4. Substring match on aliases
-  match = CURATED_FOODS.find((f) => f.aliases.some((a) => a.toLowerCase().includes(q) || q.includes(a.toLowerCase())))
-  if (match) return { food: match, matchType: 'substring' }
-
-  return { food: null, matchType: 'none' }
-}
-
-export function findBestLocalMatch(query: string): CuratedFood | null {
-  return findBestLocalMatchWithDetails(query).food
-}
+import { resolveFood, resolveFoodById } from './nutritionResolver'
 
 // Map AI extracted food item to a proposed log structure
 export function mapExtractedToProposed(extracted: AIExtractedFood): ProposedFoodLog {
   const safeQty = Math.max(0, extracted.quantity)
   const safeExtracted = { ...extracted, quantity: safeQty }
-  const { food: foodMatch, matchType } = findBestLocalMatchWithDetails(safeExtracted.food)
+  const resolved = resolveFood(safeExtracted.food)
+  const foodMatch = resolved ? resolved.food : null
   const id = generateId()
 
   let selectedServingSize: ServingSize | null = null
   let resolvedWeightG: number | null
   let confidence: 'high' | 'medium' | 'low'
   let source: ProposedFoodLog['source']
+  let diaas: number | null = null
 
-  if (foodMatch) {
-    source = 'curated'
+  if (resolved && foodMatch) {
+    source = resolved.source
+    diaas = resolved.diaas
     // Attempt portion resolution
     const resolution = resolvePortionWeight(safeExtracted.food, safeQty, safeExtracted.unit)
     if (resolution.weightG !== null) {
       resolvedWeightG = resolution.weightG
-      confidence = matchType === 'exact' ? 'high' : 'medium'
+      confidence = resolved.confidence
       
       // Attempt to map selected serving size
       const normUnit = normalizeUnit(safeExtracted.unit)
@@ -127,6 +97,7 @@ export function mapExtractedToProposed(extracted: AIExtractedFood): ProposedFood
     calculatedFat,
     confidence,
     source,
+    diaas,
   }
 }
 
@@ -154,6 +125,13 @@ export function recalculateProposed(
                                 'selectedServingSize' in updates
 
   if (merged.matchedFood) {
+    // Re-resolve source and diaas score if the matchedFood has changed/updated
+    const resolved = resolveFoodById(merged.matchedFood.id)
+    if (resolved) {
+      merged.source = resolved.source
+      merged.diaas = resolved.diaas
+    }
+
     if (isWeightOrFoodUpdate || !isMacroUpdate) {
       if (merged.resolvedWeightG !== null) {
         const ratio = merged.resolvedWeightG / 100

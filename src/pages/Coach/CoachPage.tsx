@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Brain, Loader, Sparkles, X, Check } from 'lucide-react'
-import { useGoalsStore, useWeightStore, useFoodStore, useWorkoutStore, useMemoryStore, useProfileStore, useSettingsStore, useChatStore } from '@/store/index'
+import { useGoalsStore, useWeightStore, useFoodStore, useWorkoutStore, useMemoryStore, useProfileStore, useSettingsStore, useChatStore, useRecoveryStore } from '@/store/index'
 import { createAIProvider, extractMemorySuggestions } from '@/lib/ai'
 import type { FitnessContext } from '@/lib/ai'
 import { todayISO, daysAgo } from '@/lib/utils'
@@ -63,6 +63,8 @@ export function CoachPage() {
     const nutritionAnalytics = getNutritionAnalytics(foodLogs, activeGoal?.calorieTarget || 2000, activeGoal?.proteinTarget || 150)
     const nutritionIntelligence = generateNutritionCoachContext(nutritionRecommendation, nutritionAnalytics, activeGoal)
 
+    const { recoveryLogs } = useRecoveryStore.getState()
+
     return {
       profile,
       activeGoal,
@@ -70,6 +72,7 @@ export function CoachPage() {
       todayNutrition,
       targetNutrition: { calories: activeGoal?.calorieTarget || 2000, protein: activeGoal?.proteinTarget || 150 },
       recentWorkouts: sessions.slice(0, 10),
+      recentRecovery: recoveryLogs.slice(0, 10),
       memories: memories.filter((m) => m.isApproved),
       todayDate: today,
       trainingIntelligence,

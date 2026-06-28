@@ -11,6 +11,7 @@ const STATUS_CONFIG: Record<SyncStatus, { icon: React.ReactNode; label: string; 
   syncing: { icon: <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />, label: 'Syncing…', color: 'var(--amber)' },
   success: { icon: <CheckCircle size={14} />,  label: 'Synced',      color: 'var(--emerald)' },
   error:   { icon: <CloudOff size={14} />,     label: 'Sync failed', color: 'var(--red)' },
+  offline: { icon: <CloudOff size={14} />,     label: 'Offline mode', color: 'var(--text-muted)' },
 }
 
 export function SyncIndicator({ compact = false }: SyncIndicatorProps) {
