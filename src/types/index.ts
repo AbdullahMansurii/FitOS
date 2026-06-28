@@ -195,6 +195,8 @@ export interface SavedMealItem {
   foodItemId: string
   foodItem?: FoodItem
   quantityG: number
+  loggedQuantity?: number
+  loggedUnit?: string
 }
 
 export interface NutritionSummary {

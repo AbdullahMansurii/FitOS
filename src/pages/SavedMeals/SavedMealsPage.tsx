@@ -7,7 +7,7 @@ import { useFoodStore, useUIStore } from '@/store/index'
 import { todayISO, generateId } from '@/lib/utils'
 import { getAllFoods, resolveFoodById } from '@/lib/nutritionResolver'
 import { weightedAverageScore } from '@/lib/proteinQuality'
-import type { SavedMeal, MealType, CuratedFood } from '@/types'
+import type { SavedMeal, MealType } from '@/types'
 import { Modal } from '@/components/shared/Modal'
 
 
@@ -33,6 +33,8 @@ interface DenormalizedMealItem {
   fatPer100g: number
   diaas: number | null
   source: string
+  loggedQuantity?: number
+  loggedUnit?: string
 }
 
 export function SavedMealsPage() {
@@ -59,6 +61,9 @@ export function SavedMealsPage() {
   const [mealItems, setMealItems] = useState<DenormalizedMealItem[]>([])
   const [foodSearch, setFoodSearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
+  const [selectedFoodForAdd, setSelectedFoodForAdd] = useState<{ food: import('@/types').CuratedFood; source: string; diaas: number | null } | null>(null)
+  const [addQty, setAddQty] = useState<number>(1)
+  const [addUnit, setAddUnit] = useState<string>('g')
 
   // Filtered Saved Meals
   const filteredMeals = savedMeals.filter(m => {
@@ -140,6 +145,9 @@ export function SavedMealsPage() {
     setMealCategory('custom')
     setMealItems([])
     setFoodSearch('')
+    setSelectedFoodForAdd(null)
+    setAddQty(1)
+    setAddUnit('g')
     setIsModalOpen(true)
   }
 
@@ -150,26 +158,57 @@ export function SavedMealsPage() {
     setMealCategory(meal.category || 'custom')
     setMealItems((meal.items as unknown as DenormalizedMealItem[]) || [])
     setFoodSearch('')
+    setSelectedFoodForAdd(null)
+    setAddQty(1)
+    setAddUnit('g')
     setIsModalOpen(true)
   }
 
-  // Add item to draft meal
-  const handleAddFoodItem = (food: CuratedFood, source: string, diaas: number | null) => {
+  // Select a search food for quantity configuration
+  const handleSelectFoodForAdd = (food: import('@/types').CuratedFood, source: string, diaas: number | null) => {
+    setSelectedFoodForAdd({ food, source, diaas })
+    setFoodSearch('')
+    setShowDropdown(false)
+    
+    // Choose sensible default unit and quantity
+    if (food.servingSizes && food.servingSizes.length > 0) {
+      setAddUnit(food.servingSizes[0].name)
+      setAddQty(1)
+    } else {
+      setAddUnit('g')
+      setAddQty(100)
+    }
+  }
+
+  // Add the configured item to draft meal
+  const handleAddFoodItem = () => {
+    if (!selectedFoodForAdd) return
+    const { food, source, diaas } = selectedFoodForAdd
+
+    // Calculate total weight in grams
+    const totalGrams = addUnit === 'g'
+      ? addQty
+      : (() => {
+          const matchSize = food.servingSizes.find(s => s.name === addUnit)
+          return matchSize ? addQty * matchSize.weightG : addQty * 100
+        })()
+
     const newItem: DenormalizedMealItem = {
       id: generateId(),
       foodItemId: food.id,
       name: food.name,
-      quantityG: 100, // Default 100g
+      quantityG: totalGrams,
       caloriesPer100g: food.caloriesPer100g,
       proteinPer100g: food.proteinPer100g,
       carbsPer100g: food.carbsPer100g,
       fatPer100g: food.fatPer100g,
       diaas,
-      source
+      source,
+      loggedQuantity: addQty,
+      loggedUnit: addUnit
     }
     setMealItems([...mealItems, newItem])
-    setFoodSearch('')
-    setShowDropdown(false)
+    setSelectedFoodForAdd(null)
   }
 
 
@@ -549,7 +588,7 @@ export function SavedMealsPage() {
                   filteredDatabaseFoods.map(rf => (
                     <div
                       key={rf.food.id}
-                      onClick={() => handleAddFoodItem(rf.food, rf.source, rf.diaas)}
+                      onClick={() => handleSelectFoodForAdd(rf.food, rf.source, rf.diaas)}
                       style={{
                         padding: '8px 12px', cursor: 'pointer', fontSize: 12,
                         borderBottom: '1px solid var(--border-subtle)',
@@ -579,6 +618,203 @@ export function SavedMealsPage() {
             )}
           </div>
 
+          {selectedFoodForAdd && (
+            <div style={{
+              background: 'var(--bg-elevated)', border: '1px solid var(--accent-glow)',
+              borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12
+            }}>
+              {/* Title & Cancel */}
+              <div className="flex-between">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+                    Add {selectedFoodForAdd.food.name}
+                  </span>
+                  {selectedFoodForAdd.source === 'personal_chart' && (
+                    <span style={{ fontSize: 9, padding: '1px 4px', background: 'rgba(34,197,94,0.1)', color: 'rgb(34,197,94)', borderRadius: 4 }}>
+                      CHART
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFoodForAdd(null)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Quantity [-] [ 3 ] [+] and Unit Dropdown */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div className="flex-start" style={{ gap: 4, background: 'var(--bg-base)', borderRadius: 8, padding: '2px 6px', border: '1px solid var(--border-subtle)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAddQty(prev => Math.max(0.1, Math.round((prev - 1) * 10) / 10))}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 8px', fontWeight: 'bold', fontSize: 16 }}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    step="any"
+                    value={addQty}
+                    onChange={(e) => setAddQty(parseFloat(e.target.value) || 0)}
+                    style={{ width: 60, background: 'none', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: 13, outline: 'none' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAddQty(prev => Math.round((prev + 1) * 10) / 10)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 8px', fontWeight: 'bold', fontSize: 16 }}
+                  >
+                    +
+                  </button>
+                </div>
+
+                <select
+                  value={addUnit}
+                  onChange={(e) => setAddUnit(e.target.value)}
+                  className="input"
+                  style={{ height: 34, fontSize: 13, flex: 1 }}
+                >
+                  <option value="g">grams (g)</option>
+                  {selectedFoodForAdd.food.servingSizes.map(s => (
+                    <option key={s.name} value={s.name}>{s.name} ({s.weightG}g)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick Preset Chips */}
+              {(() => {
+                const food = selectedFoodForAdd.food;
+                const nameLower = food.name.toLowerCase();
+                
+                const presets: { label: string; qty: number; unit: string }[] = (() => {
+                  if (nameLower.includes('egg')) {
+                    return [
+                      { label: '1 Whole', qty: 1, unit: 'Piece' },
+                      { label: '2 Eggs', qty: 2, unit: 'Piece' },
+                      { label: '3 Eggs', qty: 3, unit: 'Piece' },
+                      { label: '4 Eggs', qty: 4, unit: 'Piece' },
+                      { label: '5 Eggs', qty: 5, unit: 'Piece' },
+                      { label: '6 Eggs', qty: 6, unit: 'Piece' },
+                    ];
+                  } else if (nameLower.includes('whey') || nameLower.includes('protein powder') || nameLower.includes('scoop')) {
+                    return [
+                      { label: '1 Scoop', qty: 1, unit: 'Scoop' },
+                      { label: '1.5 Scoops', qty: 1.5, unit: 'Scoop' },
+                      { label: '2 Scoops', qty: 2, unit: 'Scoop' },
+                    ];
+                  } else if (nameLower.includes('chicken') || nameLower.includes('fish') || nameLower.includes('meat') || nameLower.includes('paneer') || nameLower.includes('tofu') || nameLower.includes('curd') || nameLower.includes('yogurt')) {
+                    return [
+                      { label: '100g', qty: 100, unit: 'g' },
+                      { label: '150g', qty: 150, unit: 'g' },
+                      { label: '200g', qty: 200, unit: 'g' },
+                      { label: '250g', qty: 250, unit: 'g' },
+                      { label: '300g', qty: 300, unit: 'g' },
+                    ];
+                  } else if (nameLower.includes('rice') || nameLower.includes('oats') || nameLower.includes('dal') || nameLower.includes('lentils') || nameLower.includes('roti') || nameLower.includes('chapati')) {
+                    return [
+                      { label: '50g', qty: 50, unit: 'g' },
+                      { label: '75g', qty: 75, unit: 'g' },
+                      { label: '100g', qty: 100, unit: 'g' },
+                      { label: '125g', qty: 125, unit: 'g' },
+                      { label: '150g', qty: 150, unit: 'g' },
+                    ];
+                  } else {
+                    // Fallback: If custom serving sizes exist, show servings presets
+                    if (food.servingSizes && food.servingSizes.length > 0) {
+                      const u = food.servingSizes[0].name;
+                      return [
+                        { label: `1 ${u}`, qty: 1, unit: u },
+                        { label: `2 ${u}s`, qty: 2, unit: u },
+                        { label: `3 ${u}s`, qty: 3, unit: u },
+                      ];
+                    } else {
+                      return [
+                        { label: '50g', qty: 50, unit: 'g' },
+                        { label: '100g', qty: 100, unit: 'g' },
+                        { label: '150g', qty: 150, unit: 'g' },
+                        { label: '200g', qty: 200, unit: 'g' },
+                        { label: '250g', qty: 250, unit: 'g' },
+                      ];
+                    }
+                  }
+                })()
+
+                // Filter out preset units not available in the food database
+                const sanitizedPresets = presets.map(p => {
+                  if (p.unit !== 'g' && !food.servingSizes.some(s => s.name === p.unit)) {
+                    const firstServ = food.servingSizes[0];
+                    return firstServ ? { label: `${p.qty} ${firstServ.name}`, qty: p.qty, unit: firstServ.name } : { label: `${p.qty * 30}g`, qty: p.qty * 30, unit: 'g' };
+                  }
+                  return p;
+                });
+
+                return (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {sanitizedPresets.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setAddQty(p.qty);
+                          setAddUnit(p.unit);
+                        }}
+                        style={{
+                          fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                          background: (addQty === p.qty && addUnit === p.unit) ? 'var(--accent)' : 'var(--bg-base)',
+                          color: (addQty === p.qty && addUnit === p.unit) ? '#0a0b0f' : 'var(--text-secondary)',
+                          border: '1px solid var(--border-subtle)'
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Live Preview Macro Calculator & Add Button */}
+              {(() => {
+                const food = selectedFoodForAdd.food;
+                const totalGrams = addUnit === 'g'
+                  ? addQty
+                  : (() => {
+                      const matchSize = food.servingSizes.find(s => s.name === addUnit);
+                      return matchSize ? addQty * matchSize.weightG : addQty * 100;
+                    })()
+                const ratio = totalGrams / 100;
+                const cal = Math.round(food.caloriesPer100g * ratio);
+                const prot = Math.round(food.proteinPer100g * ratio * 10) / 10;
+                const carb = Math.round(food.carbsPer100g * ratio * 10) / 10;
+                const fat = Math.round(food.fatPer100g * ratio * 10) / 10;
+
+                return (
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: 'var(--bg-base)', padding: 12, borderRadius: 8, marginTop: 4,
+                    border: '1px solid var(--border-subtle)'
+                  }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 600 }}>{cal} kcal</span> · {prot}g P · {carb}g C · {fat}g F
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Total weight: {Math.round(totalGrams)} g
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleAddFoodItem}
+                      style={{ padding: '6px 14px', fontSize: 12, height: 30 }}
+                    >
+                      Add Food
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Added items list */}
           <div className="input-group">
             <label className="input-label">Foods in Template ({mealItems.length})</label>
@@ -599,40 +835,70 @@ export function SavedMealsPage() {
                         </div>
                       </div>
 
-                      {/* Weight Selector */}
+                      {/* Inline Quantity & Unit Editor */}
                       <div className="flex-start" style={{ gap: 6, flexShrink: 0 }}>
-                        <input
-                          type="number"
-                          className="input"
-                          style={{ width: 64, height: 28, padding: '2px 6px', fontSize: 11, textAlign: 'center' }}
-                          value={item.quantityG}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0
-                            setMealItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityG: val } : it))
-                          }}
-                        />
+                        {/* Quantity decrement/increment */}
+                        {(() => {
+                          const currentUnit = item.loggedUnit || 'g';
+                          const servingWeight = currentUnit === 'g' ? 1 : (resolved.food.servingSizes.find(s => s.name === currentUnit)?.weightG || 100);
+                          const currentQty = item.loggedQuantity ?? Math.round((item.quantityG / servingWeight) * 10) / 10;
 
-                        {/* Serving sizes helper dropdown */}
-                        <select
-                          className="input"
-                          style={{ height: 28, fontSize: 10, padding: '2px 4px' }}
-                          onChange={(e) => {
-                            const sizeWeight = parseFloat(e.target.value)
-                            if (sizeWeight > 0) {
-                                setMealItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityG: sizeWeight } : it))
-                            }
-                          }}
-                          defaultValue=""
-                        >
-                          <option value="">(g)</option>
-                          {resolved.food.servingSizes.map(s => (
-                              <option key={s.name} value={s.weightG}>{s.name} ({s.weightG}g)</option>
-                          ))}
-                        </select>
+                          const updateItemQtyAndUnit = (q: number, u: string) => {
+                            const weightFactor = u === 'g' ? 1 : (resolved.food.servingSizes.find(s => s.name === u)?.weightG || 100);
+                            const finalGrams = q * weightFactor;
+                            setMealItems(prev => prev.map((it, i) => i === idx ? {
+                              ...it,
+                              quantityG: finalGrams,
+                              loggedQuantity: q,
+                              loggedUnit: u
+                            } : it));
+                          };
+
+                          return (
+                            <>
+                              <div className="flex-start" style={{ gap: 2, background: 'var(--bg-base)', borderRadius: 6, padding: '1px 4px', border: '1px solid var(--border-subtle)', height: 28 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItemQtyAndUnit(Math.max(0.1, Math.round((currentQty - 1) * 10) / 10), currentUnit)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 4px', fontSize: 13, fontWeight: 'bold' }}
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={currentQty}
+                                  onChange={(e) => updateItemQtyAndUnit(parseFloat(e.target.value) || 0, currentUnit)}
+                                  style={{ width: 44, background: 'none', border: 'none', color: 'var(--text-primary)', textAlign: 'center', fontSize: 11, outline: 'none' }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateItemQtyAndUnit(Math.round((currentQty + 1) * 10) / 10, currentUnit)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 4px', fontSize: 13, fontWeight: 'bold' }}
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <select
+                                className="input"
+                                style={{ height: 28, fontSize: 11, padding: '2px 4px', width: 80 }}
+                                value={currentUnit}
+                                onChange={(e) => updateItemQtyAndUnit(currentQty, e.target.value)}
+                              >
+                                <option value="g">g</option>
+                                {resolved.food.servingSizes.map(s => (
+                                  <option key={s.name} value={s.name}>{s.name}</option>
+                                ))}
+                              </select>
+                            </>
+                          );
+                        })()}
 
                         <button
+                          type="button"
                           onClick={() => setMealItems(mealItems.filter((_, i) => i !== idx))}
-                          style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}
                         >
                           <X size={14} />
                         </button>
