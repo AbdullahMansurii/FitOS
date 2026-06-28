@@ -48,6 +48,7 @@ export function Modal({
     document.body.style.top = `-${scrollYRef.current}px`
     document.body.style.width = '100%'
     document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
 
     // 3. Focus the modal container
     if (modalRef.current) {
@@ -95,6 +96,7 @@ export function Modal({
       document.body.style.top = ''
       document.body.style.width = ''
       document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
       document.body.style.paddingRight = originalPaddingRightRef.current
 
       // Restore scroll position

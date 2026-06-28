@@ -222,38 +222,41 @@ export function WorkoutPage() {
           ))}
         </div>
 
-        {showCompleteModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 380, padding: 28 }}>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 20 }}>Complete Workout</h2>
-              <div style={{ marginBottom: 16 }}>
-                <label className="input-label">Rate this session</label>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  {[1,2,3,4,5].map((s) => (
-                    <button key={s} onClick={() => setSessionRating(s)} style={{ fontSize: 28, background: 'none', border: 'none', cursor: 'pointer', opacity: s <= sessionRating ? 1 : 0.3, transition: '0.15s' }}>★</button>
-                  ))}
-                </div>
-              </div>
-              <div className="input-group" style={{ marginBottom: 20 }}>
-                <label className="input-label">Notes (optional)</label>
-                <textarea
-                  className="input"
-                  rows={3}
-                  value={sessionNotes}
-                  onChange={(e) => setSessionNotes(e.target.value)}
-                  placeholder="How did it go?"
-                  style={{ resize: 'none' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-secondary" onClick={() => setShowCompleteModal(false)} style={{ flex: 1 }}>Back</button>
-                <button className="btn btn-primary" onClick={handleCompleteSession} style={{ flex: 2 }}>
-                  <CheckCircle size={14} /> Complete
-                </button>
+        <Modal
+          isOpen={showCompleteModal}
+          onClose={() => setShowCompleteModal(false)}
+          closeOnOverlayClick={false}
+          maxWidth={380}
+          title="Complete Workout"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label className="input-label">Rate this session</label>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                {[1,2,3,4,5].map((s) => (
+                  <button key={s} onClick={() => setSessionRating(s)} style={{ fontSize: 28, background: 'none', border: 'none', cursor: 'pointer', opacity: s <= sessionRating ? 1 : 0.3, transition: '0.15s' }}>★</button>
+                ))}
               </div>
             </div>
+            <div className="input-group">
+              <label className="input-label">Notes (optional)</label>
+              <textarea
+                className="input"
+                rows={3}
+                value={sessionNotes}
+                onChange={(e) => setSessionNotes(e.target.value)}
+                placeholder="How did it go?"
+                style={{ resize: 'none' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setShowCompleteModal(false)} style={{ flex: 1 }}>Back</button>
+              <button className="btn btn-primary" onClick={handleCompleteSession} style={{ flex: 2 }}>
+                <CheckCircle size={14} /> Complete
+              </button>
+            </div>
           </div>
-        )}
+        </Modal>
       </div>
     )
   }
@@ -579,13 +582,15 @@ export function WorkoutPage() {
         </div>
       )}
 
-      {/* Custom Exercise Modal */}
-      {showExModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <form className="card-glass animate-fade-in" onSubmit={handleCreateExercise} style={{ width: '100%', maxWidth: 440, padding: 28 }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 20 }}>Create Custom Exercise</h2>
-            
-            <div className="input-group" style={{ marginBottom: 14 }}>
+        <Modal
+          isOpen={showExModal}
+          onClose={() => setShowExModal(false)}
+          closeOnOverlayClick={false}
+          maxWidth={440}
+          title="Create Custom Exercise"
+        >
+          <form onSubmit={handleCreateExercise} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="input-group">
               <label className="input-label">Exercise Name</label>
               <input
                 className="input"
@@ -597,7 +602,7 @@ export function WorkoutPage() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 12 }}>
               <div className="input-group" style={{ flex: 1 }}>
                 <label className="input-label">Category</label>
                 <select
@@ -623,7 +628,7 @@ export function WorkoutPage() {
               </div>
             </div>
 
-            <div className="input-group" style={{ marginBottom: 14 }}>
+            <div className="input-group">
               <label className="input-label" style={{ marginBottom: 8 }}>Target Muscle Groups</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, maxHeight: 110, overflowY: 'auto', padding: 4, background: 'var(--bg-base)', borderRadius: 8 }}>
                 {['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Abs', 'Core', 'Cardiovascular'].map((muscle) => (
@@ -639,7 +644,7 @@ export function WorkoutPage() {
               </div>
             </div>
 
-            <div className="input-group" style={{ marginBottom: 20 }}>
+            <div className="input-group">
               <label className="input-label">Instructions / Description</label>
               <textarea
                 className="input"
@@ -651,13 +656,12 @@ export function WorkoutPage() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowExModal(false)} style={{ flex: 1 }}>Cancel</button>
               <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>Save Exercise</button>
             </div>
           </form>
-        </div>
-      )}
+        </Modal>
 
       {/* Exercise Analytics Modal */}
       {selectedAnalyticsExId && (() => {
@@ -667,154 +671,151 @@ export function WorkoutPage() {
         const rec = recommendationsMap[selectedAnalyticsExId]
 
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} data-testid="analytics-modal">
-            <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 500, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
-              <div className="flex-between" style={{ marginBottom: 20 }}>
-                <div>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>{ex.name}</h2>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ex.muscleGroups.join(', ')} · {ex.equipment || 'No Equipment'}</div>
+          <Modal
+            isOpen={!!selectedAnalyticsExId}
+            onClose={() => setSelectedAnalyticsExId(null)}
+            maxWidth={500}
+            title={
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, margin: 0 }}>{ex.name}</h2>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 'normal', marginTop: 2 }}>
+                  {ex.muscleGroups.join(', ')} · {ex.equipment || 'No Equipment'}
                 </div>
-                <button
-                  onClick={() => setSelectedAnalyticsExId(null)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}
-                >
-                  <X size={18} />
-                </button>
+              </div>
+            }
+          >
+            {/* Warnings inside analytics modal */}
+            {rec?.fatigueWarning && (
+              <div style={{
+                background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.2)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start'
+              }}>
+                <AlertTriangle size={16} color="var(--red)" style={{ marginTop: 2, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--red)' }}>⚠ Recovery Warning</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Strength and training volume have declined over multiple sessions. Focus on recovery, sleep, and nutrition.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {rec?.stallDetected && (
+              <div style={{
+                background: 'var(--amber-bg)', border: '1px solid rgba(251,191,36,0.2)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start'
+              }}>
+                <AlertTriangle size={16} color="var(--amber)" style={{ marginTop: 2, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--amber)' }}>⚠ Plateau Detected</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Performance has stagnated. Recommended Deload: <strong>{rec.suggestedWeight ?? 0}kg</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* 1. Current PRs */}
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Current PRs
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best Weight</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                      {intel.personalRecords.heaviestWeight ? `${intel.personalRecords.heaviestWeight.value} kg` : '—'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best Volume</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                      {intel.personalRecords.highestVolume ? `${Math.round(intel.personalRecords.highestVolume.value)} kg` : '—'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best e1RM</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                      {intel.personalRecords.highestE1RM ? `${Math.round(intel.personalRecords.highestE1RM.value)} kg` : '—'}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Warnings inside analytics modal */}
-              {rec?.fatigueWarning && (
-                <div style={{
-                  background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.2)',
-                  borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start'
-                }}>
-                  <AlertTriangle size={16} color="var(--red)" style={{ marginTop: 2, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--red)' }}>⚠ Recovery Warning</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Strength and training volume have declined over multiple sessions. Focus on recovery, sleep, and nutrition.
+              {/* 2. 30-Day Trends */}
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  30-Day Trends
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>e1RM Trend</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: intel.trends30d.e1rmPctChange === null ? 'var(--text-primary)' : intel.trends30d.e1rmPctChange >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
+                      {intel.trends30d.e1rmPctChange !== null ? `${intel.trends30d.e1rmPctChange >= 0 ? '+' : ''}${intel.trends30d.e1rmPctChange}%` : 'Need 2+ logs'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Volume Trend</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: intel.trends30d.volumePctChange === null ? 'var(--text-primary)' : intel.trends30d.volumePctChange >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
+                      {intel.trends30d.volumePctChange !== null ? `${intel.trends30d.volumePctChange >= 0 ? '+' : ''}${intel.trends30d.volumePctChange}%` : 'Need 2+ logs'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Progressive Overload */}
+              {rec && rec.recommendationType !== 'insufficient_data' && (
+                <div>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Progressive Overload
+                  </h3>
+                  <div style={{ padding: 14, background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, textTransform: 'capitalize' }}>
+                      {rec.recommendationType.replace('_', ' ')}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      Suggested Target: <strong>{rec.suggestedWeight}kg × {rec.suggestedReps} reps</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                      <div>Readiness: <strong style={{ color: rec.readinessScore >= 75 ? 'var(--emerald)' : 'var(--amber)' }}>{rec.readinessScore}/100</strong></div>
+                      <div>Confidence: <strong style={{ color: rec.confidence === 'high' ? 'var(--emerald)' : 'var(--accent)' }}>{rec.confidence.toUpperCase()}</strong></div>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-base)', padding: '6px 10px', borderRadius: 6, lineHeight: 1.4, marginTop: 10 }}>
+                      {rec.reason}
                     </div>
                   </div>
                 </div>
               )}
 
-              {rec?.stallDetected && (
-                <div style={{
-                  background: 'var(--amber-bg)', border: '1px solid rgba(251,191,36,0.2)',
-                  borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start'
-                }}>
-                  <AlertTriangle size={16} color="var(--amber)" style={{ marginTop: 2, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--amber)' }}>⚠ Plateau Detected</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Performance has stagnated. Recommended Deload: <strong>{rec.suggestedWeight ?? 0}kg</strong>
-                    </div>
+              {/* 4. Recovery Status */}
+              <div>
+                <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Recovery Status
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Fatigue Flag</span>
+                    <span style={{ fontWeight: 600, color: rec?.fatigueWarning ? 'var(--red)' : 'var(--emerald)' }}>
+                      {rec?.fatigueWarning ? 'HIGH FATIGUE' : 'Nominal'}
+                    </span>
                   </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                {/* 1. Current PRs */}
-                <div>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    Current PRs
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best Weight</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
-                        {intel.personalRecords.heaviestWeight ? `${intel.personalRecords.heaviestWeight.value} kg` : '—'}
-                      </div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best Volume</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
-                        {intel.personalRecords.highestVolume ? `${Math.round(intel.personalRecords.highestVolume.value)} kg` : '—'}
-                      </div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Best e1RM</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
-                        {intel.personalRecords.highestE1RM ? `${Math.round(intel.personalRecords.highestE1RM.value)} kg` : '—'}
-                      </div>
-                    </div>
+                  <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Plateau Detected</span>
+                    <span style={{ fontWeight: 600, color: rec?.stallDetected ? 'var(--amber)' : 'var(--emerald)' }}>
+                      {rec?.stallDetected ? 'STALLING' : 'No'}
+                    </span>
                   </div>
-                </div>
-
-                {/* 2. 30-Day Trends */}
-                <div>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    30-Day Trends
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>e1RM Trend</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: intel.trends30d.e1rmPctChange === null ? 'var(--text-primary)' : intel.trends30d.e1rmPctChange >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
-                        {intel.trends30d.e1rmPctChange !== null ? `${intel.trends30d.e1rmPctChange >= 0 ? '+' : ''}${intel.trends30d.e1rmPctChange}%` : 'Need 2+ logs'}
-                      </div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Volume Trend</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: intel.trends30d.volumePctChange === null ? 'var(--text-primary)' : intel.trends30d.volumePctChange >= 0 ? 'var(--emerald)' : 'var(--red)' }}>
-                        {intel.trends30d.volumePctChange !== null ? `${intel.trends30d.volumePctChange >= 0 ? '+' : ''}${intel.trends30d.volumePctChange}%` : 'Need 2+ logs'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Progressive Overload */}
-                {rec && rec.recommendationType !== 'insufficient_data' && (
-                  <div>
-                    <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
-                      Progressive Overload
-                    </h3>
-                    <div style={{ padding: 14, background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, textTransform: 'capitalize' }}>
-                        {rec.recommendationType.replace('_', ' ')}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                        Suggested Target: <strong>{rec.suggestedWeight}kg × {rec.suggestedReps} reps</strong>
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-                        <div>Readiness: <strong style={{ color: rec.readinessScore >= 75 ? 'var(--emerald)' : 'var(--amber)' }}>{rec.readinessScore}/100</strong></div>
-                        <div>Confidence: <strong style={{ color: rec.confidence === 'high' ? 'var(--emerald)' : 'var(--accent)' }}>{rec.confidence.toUpperCase()}</strong></div>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-base)', padding: '6px 10px', borderRadius: 6, lineHeight: 1.4, marginTop: 10 }}>
-                        {rec.reason}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Recovery Status */}
-                <div>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    Recovery Status
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Fatigue Flag</span>
-                      <span style={{ fontWeight: 600, color: rec?.fatigueWarning ? 'var(--red)' : 'var(--emerald)' }}>
-                        {rec?.fatigueWarning ? 'HIGH FATIGUE' : 'Nominal'}
-                      </span>
-                    </div>
-                    <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Plateau Detected</span>
-                      <span style={{ fontWeight: 600, color: rec?.stallDetected ? 'var(--amber)' : 'var(--emerald)' }}>
-                        {rec?.stallDetected ? 'STALLING' : 'No'}
-                      </span>
-                    </div>
-                    <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Weekly Frequency</span>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {rec ? `${rec.weeklyFrequency.toFixed(1)} sessions/week` : '0 sessions/week'}
-                      </span>
-                    </div>
+                  <div className="flex-between" style={{ padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 8, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Weekly Frequency</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {rec ? `${rec.weeklyFrequency.toFixed(1)} sessions/week` : '0 sessions/week'}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Modal>
         )
       })()}
     </div>
