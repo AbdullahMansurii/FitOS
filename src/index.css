@@ -522,3 +522,40 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ─── Modal Animations ─── */
+@keyframes modal-scale-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes modal-slide-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .card-glass {
+    animation: modal-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .card-glass {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+

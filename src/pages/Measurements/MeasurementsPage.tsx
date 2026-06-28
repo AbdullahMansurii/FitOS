@@ -3,6 +3,7 @@ import { Ruler, Plus, Edit, Trash2, Calendar, AlertCircle } from 'lucide-react'
 import { useWeightStore, useProfileStore } from '@/store/index'
 import type { Measurement } from '@/types'
 import { todayISO, formatDate } from '@/lib/utils'
+import { Modal } from '@/components/shared/Modal'
 
 export function MeasurementsPage() {
   const { profile } = useProfileStore()
@@ -304,215 +305,202 @@ export function MeasurementsPage() {
         </div>
       )}
 
-      {/* Log Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="p-6 border-b border-border flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-foreground">
-                {editingId ? 'Edit Measurement Entry' : 'Log Body Measurements'}
-              </h2>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted cursor-pointer"
-              >
-                ✕
-              </button>
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        maxWidth={640}
+        title={editingId ? 'Edit Measurement Entry' : 'Log Body Measurements'}
+      >
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {error && (
+            <div className="bg-red-950/40 border border-red-500/20 text-red-400 p-3 rounded-lg flex items-center gap-2 text-sm">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span>{error}</span>
             </div>
-            
-            <form onSubmit={handleSave}>
-              <div className="p-6 overflow-y-auto max-h-[70vh] grid grid-cols-1 md:grid-cols-2 gap-4">
-                {error && (
-                  <div className="col-span-full bg-red-950/40 border border-red-500/20 text-red-400 p-3 rounded-lg flex items-center gap-2 text-sm">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
+          )}
 
-                {/* Date */}
-                <div className="col-span-full">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ maxHeight: '60dvh', overflowY: 'auto', paddingRight: 4 }}>
+            {/* Date */}
+            <div className="col-span-full">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Weight */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Body Weight ({isImperial ? 'lbs' : 'kg'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 76.5"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Weight */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Body Weight ({isImperial ? 'lbs' : 'kg'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 76.5"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Waist */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Waist ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 33.5"
-                    value={waist}
-                    onChange={(e) => setWaist(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Waist */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Waist ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 33.5"
+                value={waist}
+                onChange={(e) => setWaist(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Chest */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Chest ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 40.2"
-                    value={chest}
-                    onChange={(e) => setChest(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Chest */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Chest ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 40.2"
+                value={chest}
+                onChange={(e) => setChest(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Neck */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Neck ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 14.5"
-                    value={neck}
-                    onChange={(e) => setNeck(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Neck */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Neck ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 14.5"
+                value={neck}
+                onChange={(e) => setNeck(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Hips */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Hips ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 37"
-                    value={hips}
-                    onChange={(e) => setHips(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Hips */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Hips ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 37"
+                value={hips}
+                onChange={(e) => setHips(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Spacer / formatting */}
-                <div></div>
+            {/* Spacer / formatting */}
+            <div></div>
 
-                {/* Left Arm */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Left Arm ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 15.0"
-                    value={leftArm}
-                    onChange={(e) => setLeftArm(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Left Arm */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Left Arm ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 15.0"
+                value={leftArm}
+                onChange={(e) => setLeftArm(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Right Arm */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Right Arm ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 15.1"
-                    value={rightArm}
-                    onChange={(e) => setRightArm(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Right Arm */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Right Arm ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 15.1"
+                value={rightArm}
+                onChange={(e) => setRightArm(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Left Thigh */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Left Thigh ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 23"
-                    value={leftThigh}
-                    onChange={(e) => setLeftThigh(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Left Thigh */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Left Thigh ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 23"
+                value={leftThigh}
+                onChange={(e) => setLeftThigh(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Right Thigh */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Right Thigh ({isImperial ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 23.2"
-                    value={rightThigh}
-                    onChange={(e) => setRightThigh(e.target.value)}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+            {/* Right Thigh */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                Right Thigh ({isImperial ? 'in' : 'cm'})
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 23.2"
+                value={rightThigh}
+                onChange={(e) => setRightThigh(e.target.value)}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-                {/* Notes */}
-                <div className="col-span-full">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Notes</label>
-                  <textarea
-                    placeholder="Describe how you felt, lighting conditions, or progress notes..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500 resize-none"
-                  />
-                </div>
-              </div>
-              
-              {/* Footer */}
-              <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/20">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="bg-transparent hover:bg-muted border border-border text-foreground font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg transition-colors cursor-pointer"
-                >
-                  Save Entry
-                </button>
-              </div>
-            </form>
+            {/* Notes */}
+            <div className="col-span-full">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Notes</label>
+              <textarea
+                placeholder="Describe how you felt, lighting conditions, or progress notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                className="w-full bg-muted border border-border rounded-lg p-2.5 text-foreground focus:outline-none focus:border-indigo-500 resize-none"
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Footer */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="bg-transparent hover:bg-muted border border-border text-foreground font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg transition-colors cursor-pointer"
+            >
+              Save Entry
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

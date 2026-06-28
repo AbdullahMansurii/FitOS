@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { Scale, TrendingDown, TrendingUp, Plus, Trash2, BarChart2, Ruler, Calendar, Award, Heart, Moon, Footprints, Activity, Camera, X } from 'lucide-react'
+import { Scale, TrendingDown, TrendingUp, Plus, Trash2, BarChart2, Ruler, Calendar, Award, Heart, Moon, Footprints, Activity, Camera } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useGoalsStore, useWeightStore, useWorkoutStore, useProfileStore, useFoodStore, useRecoveryStore, usePhotosStore } from '@/store/index'
 import { todayISO, formatDate, daysAgo, calcGoalProgress } from '@/lib/utils'
@@ -7,6 +7,7 @@ import { WeightLogModal } from '@/components/shared/WeightLogModal'
 import { GoalSetupModal } from '@/components/shared/GoalSetupModal'
 import { getRecompositionReport } from '@/lib/recompositionIntelligence'
 import { getNutritionAnalytics, getNutritionRecommendation } from '@/lib/nutritionIntelligence'
+import { Modal } from '@/components/shared/Modal'
 
 type Range = '7d' | '30d' | '90d'
 
@@ -1592,52 +1593,20 @@ export function ProgressPage() {
         </div>
       )}
 
-      {/* Expanded Photo Lightbox */}
-      {selectedExpandPhoto && (
-        <div 
-          style={{ 
-            position: 'fixed', 
-            inset: 0, 
-            zIndex: 999, 
-            background: 'rgba(0,0,0,0.9)', 
-            backdropFilter: 'blur(8px)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            padding: 16 
-          }}
-          onClick={() => setSelectedExpandPhoto(null)}
-        >
-          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
-            <img 
-              src={selectedExpandPhoto} 
-              alt="Expanded Progress" 
-              style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} 
-            />
-            <button 
-              onClick={() => setSelectedExpandPhoto(null)}
-              style={{ 
-                position: 'absolute', 
-                top: -12, 
-                right: -12, 
-                background: 'var(--accent)', 
-                color: '#0a0b0f', 
-                border: 'none', 
-                borderRadius: '50%', 
-                width: 28, 
-                height: 28, 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                cursor: 'pointer',
-                boxShadow: 'var(--shadow-md)'
-              }}
-            >
-              <X size={14} />
-            </button>
-          </div>
+      <Modal
+        isOpen={!!selectedExpandPhoto}
+        onClose={() => setSelectedExpandPhoto(null)}
+        maxWidth={640}
+        title="Progress Photo"
+      >
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <img 
+            src={selectedExpandPhoto || ''} 
+            alt="Expanded Progress" 
+            style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 8 }} 
+          />
         </div>
-      )}
+      </Modal>
 
       {showWeightModal && <WeightLogModal onClose={() => setShowWeightModal(false)} />}
       {showGoalModal && <GoalSetupModal onClose={() => setShowGoalModal(false)} />}

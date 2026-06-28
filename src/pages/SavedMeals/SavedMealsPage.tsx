@@ -8,6 +8,7 @@ import { todayISO, generateId } from '@/lib/utils'
 import { getAllFoods, resolveFoodById } from '@/lib/nutritionResolver'
 import { weightedAverageScore } from '@/lib/proteinQuality'
 import type { SavedMeal, MealType, CuratedFood } from '@/types'
+import { Modal } from '@/components/shared/Modal'
 
 
 const CATEGORIES = [
@@ -477,168 +478,158 @@ export function SavedMealsPage() {
         </div>
       )}
 
-      {/* CREATE / EDIT MODAL */}
-      {isModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16, overflowY: 'auto',
-        }}
-        onClick={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
-        >
-          <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 500, padding: 24, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="flex-between" style={{ marginBottom: 18 }}>
-              <div className="flex-start" style={{ gap: 8 }}>
-                <UtensilsCrossed size={18} color="var(--accent)" />
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
-                  {editingMeal ? `Edit "${editingMeal.name}"` : 'Create Saved Meal'}
-                </span>
-              </div>
-              <button className="btn btn-ghost btn-icon-sm" onClick={() => setIsModalOpen(false)}><X size={16} /></button>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        closeOnOverlayClick={false}
+        maxWidth={500}
+        title={
+          <div className="flex-start" style={{ gap: 8 }}>
+            <UtensilsCrossed size={18} color="var(--accent)" />
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
+              {editingMeal ? `Edit "${editingMeal.name}"` : 'Create Saved Meal'}
+            </span>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Name & Category */}
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 10 }}>
+            <div className="input-group">
+              <label className="input-label">Meal Template Name</label>
+              <input
+                className="input"
+                placeholder="e.g. Morning Protein Shake"
+                value={mealName}
+                onChange={(e) => setMealName(e.target.value)}
+                style={{ fontSize: 13, height: 38 }}
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Category</label>
+              <select
+                value={mealCategory}
+                onChange={(e) => setMealCategory(e.target.value)}
+                className="input"
+                style={{ fontSize: 13, height: 38 }}
+              >
+                {CATEGORIES.map(c => (
+                  <option key={c.val} value={c.val}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Add Food Item Search */}
+          <div style={{ position: 'relative' }} className="input-group">
+            <label className="input-label">Add Food Item</label>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                className="input"
+                value={foodSearch}
+                onChange={(e) => {
+                  setFoodSearch(e.target.value)
+                  setShowDropdown(true)
+                }}
+                placeholder="Type to search foods (min. 2 chars)..."
+                style={{ paddingLeft: 34, height: 38, fontSize: 13 }}
+              />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* Name & Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 10 }}>
-                <div className="input-group">
-                  <label className="input-label">Meal Template Name</label>
-                  <input
-                    className="input"
-                    placeholder="e.g. Morning Protein Shake"
-                    value={mealName}
-                    onChange={(e) => setMealName(e.target.value)}
-                    style={{ fontSize: 13, height: 38 }}
-                  />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Category</label>
-                  <select
-                    value={mealCategory}
-                    onChange={(e) => setMealCategory(e.target.value)}
-                    className="input"
-                    style={{ fontSize: 13, height: 38 }}
-                  >
-                    {CATEGORIES.filter(c => c.val !== 'all').map(c => (
-                      <option key={c.val} value={c.val}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Add Food Item Search */}
-              <div style={{ position: 'relative' }} className="input-group">
-                <label className="input-label">Add Food Item</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input
-                    className="input"
-                    value={foodSearch}
-                    onChange={(e) => {
-                      setFoodSearch(e.target.value)
-                      setShowDropdown(true)
-                    }}
-                    placeholder="Type to search foods (min. 2 chars)..."
-                    style={{ paddingLeft: 34, height: 38, fontSize: 13 }}
-                  />
-                </div>
-
-                {/* Dropdown database results */}
-                {showDropdown && foodSearch.trim().length >= 2 && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
-                    borderRadius: 8, maxHeight: 180, overflowY: 'auto', marginTop: 4,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                  }}>
-                    {filteredDatabaseFoods.length > 0 ? (
-                      filteredDatabaseFoods.map(rf => (
-                        <div
-                          key={rf.food.id}
-                          onClick={() => handleAddFoodItem(rf.food, rf.source, rf.diaas)}
-                          style={{
-                            padding: '8px 12px', cursor: 'pointer', fontSize: 12,
-                            borderBottom: '1px solid var(--border-subtle)',
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                          }}
-                          className="hover-bg"
-                        >
-                          <div>
-                            <span style={{ fontWeight: 600 }}>{rf.food.name}</span>
-                            {rf.source === 'personal_chart' && (
-                              <span style={{ fontSize: 9, padding: '1px 4px', background: 'rgba(34,197,94,0.1)', color: 'rgb(34,197,94)', borderRadius: 4, marginLeft: 6 }}>
-                                CHART
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {rf.food.caloriesPer100g} kcal/100g
+            {/* Dropdown database results */}
+            {showDropdown && foodSearch.trim().length >= 2 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+                borderRadius: 8, maxHeight: 180, overflowY: 'auto', marginTop: 4,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+              }}>
+                {filteredDatabaseFoods.length > 0 ? (
+                  filteredDatabaseFoods.map(rf => (
+                    <div
+                      key={rf.food.id}
+                      onClick={() => handleAddFoodItem(rf.food, rf.source, rf.diaas)}
+                      style={{
+                        padding: '8px 12px', cursor: 'pointer', fontSize: 12,
+                        borderBottom: '1px solid var(--border-subtle)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}
+                      className="hover-bg"
+                    >
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{rf.food.name}</span>
+                        {rf.source === 'personal_chart' && (
+                          <span style={{ fontSize: 9, padding: '1px 4px', background: 'rgba(34,197,94,0.1)', color: 'rgb(34,197,94)', borderRadius: 4, marginLeft: 6 }}>
+                            CHART
                           </span>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ padding: '10px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                        No matching foods found
+                        )}
                       </div>
-                    )}
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {rf.food.caloriesPer100g} kcal/100g
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '10px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                    No matching foods found
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Added Items List */}
-              <div>
-                <label className="input-label" style={{ marginBottom: 6 }}>Meal Items</label>
-                {mealItems.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
-                    {mealItems.map((item, idx) => (
-                      <div 
-                        key={item.id} 
-                        style={{ 
-                          display: 'grid', gridTemplateColumns: '2fr 75px 120px 30px', gap: 6, 
-                          background: 'var(--bg-elevated)', padding: 10, borderRadius: 8, alignItems: 'center' 
-                        }}
-                      >
-                        {/* Food Name */}
-                        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.name}
+          {/* Added items list */}
+          <div className="input-group">
+            <label className="input-label">Foods in Template ({mealItems.length})</label>
+            {mealItems.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                {mealItems.map((item, idx) => {
+                  const resolved = resolveFoodById(item.foodItemId)
+                  if (!resolved) return null
+                  const foodName = resolved.food.name
+                  return (
+                    <div key={idx} className="flex-between" style={{ background: 'var(--bg-elevated)', padding: '6px 10px', borderRadius: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {foodName}
                         </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          {Math.round(resolved.food.caloriesPer100g * (item.quantityG / 100))} kcal | {Math.round(resolved.food.proteinPer100g * (item.quantityG / 100))}g P
+                        </div>
+                      </div>
 
-                        {/* Weight input */}
+                      {/* Weight Selector */}
+                      <div className="flex-start" style={{ gap: 6, flexShrink: 0 }}>
                         <input
                           type="number"
+                          className="input"
+                          style={{ width: 64, height: 28, padding: '2px 6px', fontSize: 11, textAlign: 'center' }}
                           value={item.quantityG}
                           onChange={(e) => {
-                            const val = Math.max(1, parseFloat(e.target.value) || 0)
+                            const val = parseFloat(e.target.value) || 0
                             setMealItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityG: val } : it))
                           }}
-                          className="input"
-                          style={{ height: 28, fontSize: 11, padding: '2px 6px', textAlign: 'center' }}
-                          min={1}
                         />
 
-                        {/* Portion / serving dropdown */}
+                        {/* Serving sizes helper dropdown */}
                         <select
                           className="input"
                           style={{ height: 28, fontSize: 10, padding: '2px 4px' }}
                           onChange={(e) => {
                             const sizeWeight = parseFloat(e.target.value)
                             if (sizeWeight > 0) {
-                              setMealItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityG: sizeWeight } : it))
+                                setMealItems(prev => prev.map((it, i) => i === idx ? { ...it, quantityG: sizeWeight } : it))
                             }
                           }}
                           defaultValue=""
                         >
-                          <option value="">Custom (g)</option>
-                          {/* Fetch food serving sizes */}
-                          {(() => {
-                            const resolved = resolveFoodById(item.foodItemId)
-                            return resolved?.food.servingSizes.map(s => (
+                          <option value="">(g)</option>
+                          {resolved.food.servingSizes.map(s => (
                               <option key={s.name} value={s.weightG}>{s.name} ({s.weightG}g)</option>
-                            ))
-                          })()}
+                          ))}
                         </select>
 
-                        {/* Delete button */}
                         <button
                           onClick={() => setMealItems(mealItems.filter((_, i) => i !== idx))}
                           style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -646,116 +637,106 @@ export function SavedMealsPage() {
                           <X size={14} />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ border: '1px dashed var(--border-default)', padding: 16, borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                    No food items added. Search above to add foods.
-                  </div>
-                )}
+                    </div>
+                  )
+                })}
               </div>
+            ) : (
+              <div style={{ border: '1px dashed var(--border-default)', padding: 16, borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                No food items added. Search above to add foods.
+              </div>
+            )}
+          </div>
 
-              {/* Template Live Preview */}
-              {mealItems.length > 0 && (
-                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12, marginTop: 4 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
-                    TEMPLATE TOTALS PREVIEW
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 8, color: 'var(--macro-calories)', fontWeight: 600 }}>CALORIES</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-calories)' }}>{totals.calories} kcal</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 8, color: 'var(--macro-protein)', fontWeight: 600 }}>PROTEIN</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-protein)' }}>{totals.protein}g</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 8, color: 'var(--macro-carbs)', fontWeight: 600 }}>CARBS</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-carbs)' }}>{totals.carbs}g</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 8, color: 'var(--macro-fat)', fontWeight: 600 }}>FAT</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-fat)' }}>{totals.fat}g</div>
-                    </div>
-                  </div>
-                  
-                  {diaasAvg && (
-                    <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginTop: 8, textAlign: 'center' }}>
-                      🥇 Weighted Average DIAAS Score: {Math.round(diaasAvg.value * 100)}%
-                    </div>
-                  )}
+          {/* Template Live Preview */}
+          {mealItems.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
+                TEMPLATE TOTALS PREVIEW
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 8, color: 'var(--macro-calories)', fontWeight: 600 }}>CALORIES</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-calories)' }}>{totals.calories} kcal</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 8, color: 'var(--macro-protein)', fontWeight: 600 }}>PROTEIN</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-protein)' }}>{totals.protein}g</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 8, color: 'var(--macro-carbs)', fontWeight: 600 }}>CARBS</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-carbs)' }}>{totals.carbs}g</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 8, color: 'var(--macro-fat)', fontWeight: 600 }}>FAT</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--macro-fat)' }}>{totals.fat}g</div>
+                </div>
+              </div>
+              
+              {diaasAvg && (
+                <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginTop: 8, textAlign: 'center' }}>
+                  🥇 Weighted Average DIAAS Score: {Math.round(diaasAvg.value * 100)}%
                 </div>
               )}
-
-              {/* Save actions */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)} style={{ flex: 1 }}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleSaveMeal} style={{ flex: 2 }} disabled={!mealName.trim() || mealItems.length === 0}>
-                  {editingMeal ? 'Save Template' : 'Create Template'}
-                </button>
-              </div>
             </div>
+          )}
+
+          {/* Save actions */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)} style={{ flex: 1 }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSaveMeal} style={{ flex: 2 }} disabled={!mealName.trim() || mealItems.length === 0}>
+              {editingMeal ? 'Save Template' : 'Create Template'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* QUICK LOG MEAL MODAL */}
-      {quickLogMeal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16,
-        }}
-        onClick={() => setQuickLogMeal(null)}
-        >
-          <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 360, padding: 24 }} onClick={e => e.stopPropagation()}>
-            <div className="flex-between" style={{ marginBottom: 16 }}>
-              <div className="flex-start" style={{ gap: 8 }}>
-                <Calendar size={16} color="var(--accent)" />
-                <span style={{ fontWeight: 600, fontSize: 15 }}>Log "{quickLogMeal.name}"</span>
-              </div>
-              <button className="btn btn-ghost btn-icon-sm" onClick={() => setQuickLogMeal(null)}><X size={16} /></button>
-            </div>
+      <Modal
+        isOpen={!!quickLogMeal}
+        onClose={() => setQuickLogMeal(null)}
+        maxWidth={360}
+        title={
+          <div className="flex-start" style={{ gap: 8 }}>
+            <Calendar size={16} color="var(--accent)" />
+            <span style={{ fontWeight: 600, fontSize: 15 }}>Log "{quickLogMeal?.name}"</span>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="input-group">
+            <label className="input-label">Date to Log</label>
+            <input
+              type="date"
+              value={logDate}
+              onChange={(e) => setLogDate(e.target.value)}
+              className="input"
+              style={{ height: 38, fontSize: 13 }}
+            />
+          </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="input-group">
-                <label className="input-label">Date to Log</label>
-                <input
-                  type="date"
-                  value={logDate}
-                  onChange={(e) => setLogDate(e.target.value)}
-                  className="input"
-                  style={{ height: 38, fontSize: 13 }}
-                />
-              </div>
+          <div className="input-group">
+            <label className="input-label">Meal Type</label>
+            <select
+              value={logMealType}
+              onChange={(e) => setLogMealType(e.target.value as MealType)}
+              className="input"
+              style={{ height: 38, fontSize: 13 }}
+            >
+              <option value="breakfast">Breakfast 🌅</option>
+              <option value="lunch">Lunch ☀️</option>
+              <option value="dinner">Dinner 🌙</option>
+              <option value="snack">Snack 🍎</option>
+            </select>
+          </div>
 
-              <div className="input-group">
-                <label className="input-label">Meal Type</label>
-                <select
-                  value={logMealType}
-                  onChange={(e) => setLogMealType(e.target.value as MealType)}
-                  className="input"
-                  style={{ height: 38, fontSize: 13 }}
-                >
-                  <option value="breakfast">Breakfast 🌅</option>
-                  <option value="lunch">Lunch ☀️</option>
-                  <option value="dinner">Dinner 🌙</option>
-                  <option value="snack">Snack 🍎</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button className="btn btn-secondary" onClick={() => setQuickLogMeal(null)} style={{ flex: 1 }}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleQuickLog} style={{ flex: 2 }}>
-                  Log Now
-                </button>
-              </div>
-            </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button className="btn btn-secondary" onClick={() => setQuickLogMeal(null)} style={{ flex: 1 }}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleQuickLog} style={{ flex: 2 }}>
+              Log Now
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

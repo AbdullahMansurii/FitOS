@@ -6,6 +6,7 @@ import type { WorkoutTemplate, WorkoutTemplateExercise, SessionExercise, Exercis
 import { searchExercises } from '@/lib/exerciseSearch'
 import { getCachedRecommendation } from '@/lib/progressiveOverload'
 import { getExerciseIntelligence } from '@/lib/exerciseIntelligence'
+import { Modal } from '@/components/shared/Modal'
 
 type WorkoutTab = 'templates' | 'history' | 'exercises'
 
@@ -1418,111 +1419,103 @@ function TemplateEditor({ template, exercisesLibrary, onSave, onCancel }: Templa
       </form>
 
       {/* Add Exercise Selector Overlay Modal */}
-      {showSearchModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 110, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 500, maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 24 }}>
-            <div className="flex-between" style={{ marginBottom: 14 }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>Select Exercise</h3>
+      <Modal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        maxWidth={500}
+        title="Select Exercise"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Search inputs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              className="input"
+              type="text"
+              placeholder="Search exercises..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
               <button
                 type="button"
-                onClick={() => setShowSearchModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                onClick={() => setSelectedMuscle(null)}
+                style={{
+                  fontSize: 10, padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: selectedMuscle === null ? 'var(--accent)' : 'var(--bg-muted)',
+                  color: selectedMuscle === null ? '#0a0b0f' : 'var(--text-muted)',
+                }}
               >
-                <X size={18} />
+                All
               </button>
-            </div>
-
-            {/* Search inputs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-              <input
-                className="input"
-                type="text"
-                placeholder="Search exercises..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+              {muscleList.map((muscle) => (
                 <button
+                  key={muscle}
                   type="button"
-                  onClick={() => setSelectedMuscle(null)}
+                  onClick={() => setSelectedMuscle(muscle)}
                   style={{
                     fontSize: 10, padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                    background: selectedMuscle === null ? 'var(--accent)' : 'var(--bg-muted)',
-                    color: selectedMuscle === null ? '#0a0b0f' : 'var(--text-muted)',
+                    background: selectedMuscle === muscle ? 'var(--accent)' : 'var(--bg-muted)',
+                    color: selectedMuscle === muscle ? '#0a0b0f' : 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  All
+                  {muscle}
                 </button>
-                {muscleList.map((muscle) => (
-                  <button
-                    key={muscle}
-                    type="button"
-                    onClick={() => setSelectedMuscle(muscle)}
-                    style={{
-                      fontSize: 10, padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                      background: selectedMuscle === muscle ? 'var(--accent)' : 'var(--bg-muted)',
-                      color: selectedMuscle === muscle ? '#0a0b0f' : 'var(--text-muted)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {muscle}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* List */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {filteredExercises.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                    No exercises match "{searchQuery}"
-                  </div>
-                  {searchQuery.trim() && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => {
-                        const newEx = addExercise({
-                          name: searchQuery.trim(),
-                          category: 'strength',
-                          muscleGroups: ['Other'],
-                          isCustom: true
-                        })
-                        handleAddExercise(newEx)
-                        setSearchQuery('')
-                      }}
-                    >
-                      <Plus size={12} /> Create Custom Exercise: {searchQuery}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                filteredExercises.map((ex) => (
-                  <button
-                    key={ex.id}
-                    type="button"
-                    onClick={() => handleAddExercise(ex)}
-                    className="card nav-item"
-                    style={{
-                      padding: '10px 14px', width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px solid var(--border-default)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{ex.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {ex.muscleGroups.join(', ')}
-                      </div>
-                    </div>
-                    <Plus size={14} style={{ color: 'var(--accent)' }} />
-                  </button>
-                ))
-              )}
+              ))}
             </div>
           </div>
+
+          {/* List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+            {filteredExercises.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                  No exercises match "{searchQuery}"
+                </div>
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      const newEx = addExercise({
+                        name: searchQuery.trim(),
+                        category: 'strength',
+                        muscleGroups: ['Other'],
+                        isCustom: true
+                      })
+                      handleAddExercise(newEx)
+                      setSearchQuery('')
+                    }}
+                  >
+                    <Plus size={12} /> Create Custom Exercise: {searchQuery}
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredExercises.map((ex) => (
+                <button
+                  key={ex.id}
+                  type="button"
+                  onClick={() => handleAddExercise(ex)}
+                  className="card nav-item"
+                  style={{
+                    padding: '10px 14px', width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px solid var(--border-default)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{ex.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {ex.muscleGroups.join(', ')}
+                    </div>
+                  </div>
+                  <Plus size={14} style={{ color: 'var(--accent)' }} />
+                </button>
+              ))
+            )}
+          </div>
         </div>
-      )}
+      </Modal>
 
     </div>
   )

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, Moon, Footprints, Heart, Battery, Flame, AlignLeft } from 'lucide-react'
+import { Moon, Footprints, Heart, Battery, Flame, AlignLeft } from 'lucide-react'
 import { useRecoveryStore } from '@/store/index'
 import { todayISO } from '@/lib/utils'
+import { Modal } from './Modal'
 
 interface RecoveryLogModalProps {
   onClose: () => void
@@ -69,174 +70,167 @@ export function RecoveryLogModal({ onClose, initialDate }: RecoveryLogModalProps
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16
-    }}
-    onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      closeOnOverlayClick={false}
+      maxWidth={440}
+      title={
+        <div className="flex-start" style={{ gap: 8 }}>
+          <Heart size={18} color="var(--accent)" />
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
+            {existing ? 'Edit Recovery Log' : 'Log Recovery'}
+          </span>
+        </div>
+      }
     >
-      <div className="card-glass animate-fade-in" style={{ width: '100%', maxWidth: 440, padding: 24 }}>
-        {/* Title */}
-        <div className="flex-between" style={{ marginBottom: 20 }}>
-          <div className="flex-start" style={{ gap: 8 }}>
-            <Heart size={18} color="var(--accent)" />
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
-              {existing ? 'Edit Recovery Log' : 'Log Recovery'}
-            </span>
-          </div>
-          <button className="btn btn-ghost btn-icon-sm" onClick={onClose}><X size={16} /></button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Date Label */}
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Logging for <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{targetDate}</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Date Label */}
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Logging for <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{targetDate}</span>
-          </div>
-
-          {/* Sleep and Steps Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="input-group">
-              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Moon size={12} color="var(--blue)" /> Sleep (hrs)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="24"
-                className="input"
-                value={sleepHours}
-                onChange={(e) => setSleepHours(e.target.value)}
-                placeholder="7.5"
-                style={{ fontSize: 13, height: 38 }}
-              />
-            </div>
-            <div className="input-group">
-              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Footprints size={12} color="var(--emerald)" /> Daily Steps
-              </label>
-              <input
-                type="number"
-                min="0"
-                className="input"
-                value={dailySteps}
-                onChange={(e) => setDailySteps(e.target.value)}
-                placeholder="10000"
-                style={{ fontSize: 13, height: 38 }}
-              />
-            </div>
-          </div>
-
-          {/* Mood Slider/Selector */}
+        {/* Sleep and Steps Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="input-group">
             <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Heart size={12} color="var(--accent)" /> Mood & Well-being
+              <Moon size={12} color="var(--blue)" /> Sleep (hrs)
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-              {MOODS.map(m => (
-                <button
-                  key={m.val}
-                  type="button"
-                  onClick={() => setMood(m.val)}
-                  style={{
-                    padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
-                    background: mood === m.val ? m.color : 'var(--bg-elevated)',
-                    color: mood === m.val ? '#0a0b0f' : 'var(--text-secondary)',
-                    fontWeight: mood === m.val ? 700 : 500,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {m.label.split(' ')[1] || m.label}
-                  <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
-                    {m.label.split(' ')[0]}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Energy Levels */}
-          <div className="input-group">
-            <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Battery size={12} color="var(--amber)" /> Energy Level
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-              {ENERGIES.map(e => (
-                <button
-                  key={e.val}
-                  type="button"
-                  onClick={() => setEnergy(e.val)}
-                  style={{
-                    padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
-                    background: energy === e.val ? e.color : 'var(--bg-elevated)',
-                    color: energy === e.val ? '#0a0b0f' : 'var(--text-secondary)',
-                    fontWeight: energy === e.val ? 700 : 500,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  🔋
-                  <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
-                    {e.label.split(' ')[0]}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Muscle Soreness */}
-          <div className="input-group">
-            <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Flame size={12} color="var(--red)" /> Muscle Soreness
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-              {SORENESS_LEVELS.map(s => (
-                <button
-                  key={s.val}
-                  type="button"
-                  onClick={() => setMuscleSoreness(s.val)}
-                  style={{
-                    padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
-                    background: muscleSoreness === s.val ? s.color : 'var(--bg-elevated)',
-                    color: muscleSoreness === s.val ? '#0a0b0f' : 'var(--text-secondary)',
-                    fontWeight: muscleSoreness === s.val ? 700 : 500,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {s.val === 5 ? '🔥' : '💪'}
-                  <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
-                    {s.label.split(' ')[0]}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="input-group">
-            <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <AlignLeft size={12} /> Notes & Symptoms
-            </label>
-            <textarea
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              max="24"
               className="input"
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="How do you feel? Any joint pain, stress, or other issues?"
-              style={{ fontSize: 13, padding: '8px 12px', resize: 'none', height: 60 }}
+              value={sleepHours}
+              onChange={(e) => setSleepHours(e.target.value)}
+              placeholder="7.5"
+              style={{ fontSize: 13, height: 38 }}
             />
           </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSave} style={{ flex: 2 }}>
-              Save Log
-            </button>
+          <div className="input-group">
+            <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Footprints size={12} color="var(--emerald)" /> Daily Steps
+            </label>
+            <input
+              type="number"
+              min="0"
+              className="input"
+              value={dailySteps}
+              onChange={(e) => setDailySteps(e.target.value)}
+              placeholder="10000"
+              style={{ fontSize: 13, height: 38 }}
+            />
           </div>
         </div>
+
+        {/* Mood Slider/Selector */}
+        <div className="input-group">
+          <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Heart size={12} color="var(--accent)" /> Mood & Well-being
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+            {MOODS.map(m => (
+              <button
+                key={m.val}
+                type="button"
+                onClick={() => setMood(m.val)}
+                style={{
+                  padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
+                  background: mood === m.val ? m.color : 'var(--bg-elevated)',
+                  color: mood === m.val ? '#0a0b0f' : 'var(--text-secondary)',
+                  fontWeight: mood === m.val ? 700 : 500,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {m.label.split(' ')[1] || m.label}
+                <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
+                  {m.label.split(' ')[0]}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Energy Levels */}
+        <div className="input-group">
+          <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Battery size={12} color="var(--amber)" /> Energy Level
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+            {ENERGIES.map(e => (
+              <button
+                key={e.val}
+                type="button"
+                onClick={() => setEnergy(e.val)}
+                style={{
+                  padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
+                  background: energy === e.val ? e.color : 'var(--bg-elevated)',
+                  color: energy === e.val ? '#0a0b0f' : 'var(--text-secondary)',
+                  fontWeight: energy === e.val ? 700 : 500,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                🔋
+                <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
+                  {e.label.split(' ')[0]}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Muscle Soreness */}
+        <div className="input-group">
+          <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Flame size={12} color="var(--red)" /> Muscle Soreness
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+            {SORENESS_LEVELS.map(s => (
+              <button
+                key={s.val}
+                type="button"
+                onClick={() => setMuscleSoreness(s.val)}
+                style={{
+                  padding: '8px 4px', fontSize: 11, borderRadius: 8, cursor: 'pointer', border: 'none',
+                  background: muscleSoreness === s.val ? s.color : 'var(--bg-elevated)',
+                  color: muscleSoreness === s.val ? '#0a0b0f' : 'var(--text-secondary)',
+                  fontWeight: muscleSoreness === s.val ? 700 : 500,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {s.val === 5 ? '🔥' : '💪'}
+                <div style={{ fontSize: 8, marginTop: 2, opacity: 0.8 }}>
+                  {s.label.split(' ')[0]}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="input-group">
+          <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlignLeft size={12} /> Notes & Symptoms
+          </label>
+          <textarea
+            className="input"
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="How do you feel? Any joint pain, stress, or other issues?"
+            style={{ fontSize: 13, padding: '8px 12px', resize: 'none', height: 60 }}
+          />
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} style={{ flex: 2 }}>
+            Save Log
+          </button>
+        </div>
       </div>
-    </div>
+    </Modal>
   )
 }
