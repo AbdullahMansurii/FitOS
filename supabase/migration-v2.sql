@@ -34,6 +34,8 @@ ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS version integer DEFAULT 1;
 ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS parent_meal_id text;
 ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS is_current boolean DEFAULT true;
 ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS description text;
+ALTER TABLE saved_meals ADD COLUMN IF NOT EXISTS is_pinned boolean DEFAULT false;
 
 -- ─── 5. Recovery Logs (NEW TABLE) ───────────────────────────────
 CREATE TABLE IF NOT EXISTS recovery_logs (

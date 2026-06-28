@@ -182,6 +182,7 @@ export async function pushAll(): Promise<boolean> {
         parent_meal_id: m.parentMealId ?? null,
         is_current: m.isCurrent ?? true,
         updated_at: m.updatedAt ?? new Date().toISOString(),
+        is_pinned: m.isPinned ?? false,
       }))
       ops.push(supabase.from('saved_meals').upsert(rows, { onConflict: 'id' }) as unknown as Promise<SyncResult>)
     }
@@ -702,7 +703,7 @@ export async function pullAll(): Promise<boolean> {
         parentMealId: row.parent_meal_id,
         isCurrent: row.is_current,
         updatedAt: row.updated_at,
-        isPinned: pinnedMap.get(row.id) || false,
+        isPinned: row.is_pinned ?? (pinnedMap.get(row.id) || false),
       }))
       const savedMeals = parsedSavedMeals.filter((m) => !deletedSavedMealIds.includes(m.id))
       useFoodStore.setState({ savedMeals })

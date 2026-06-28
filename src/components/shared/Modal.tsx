@@ -25,6 +25,12 @@ export function Modal({
   const modalRef = useRef<HTMLDivElement>(null)
   const scrollYRef = useRef<number>(0)
   const originalPaddingRightRef = useRef<string>('')
+  const onCloseRef = useRef(onClose)
+
+  // Always keep ref updated with latest onClose callback
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!isOpen) return
@@ -58,7 +64,7 @@ export function Modal({
     // 4. Keyboard focus trap & escape listener
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -109,7 +115,7 @@ export function Modal({
 
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) return null
 
